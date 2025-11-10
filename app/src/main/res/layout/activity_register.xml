@@ -68,15 +68,45 @@
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="8dp"/>
 
+    <!-- Кнопки выбора типа аккаунта -->
+    <LinearLayout
+        android:id="@+id/accountTypeGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvBirthdate">
+
+        <Button
+            android:id="@+id/btnParent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Родитель" />
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnChild"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Ребёнок" />
+    </LinearLayout>
+
+
     <!-- Кнопка регистрации -->
     <Button
         android:id="@+id/btnRegister"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Зарегистрироваться"
-        app:layout_constraintTop_toBottomOf="@id/tvBirthdate"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="24dp" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/accountTypeGroup" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

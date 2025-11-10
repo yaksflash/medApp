@@ -3,17 +3,19 @@ package com.example.medapp.activities
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
+import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.medapp.R
 import java.util.Calendar
 
 class RegisterActivity : AppCompatActivity() {
+
+    private var selectedRole: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -29,12 +31,25 @@ class RegisterActivity : AppCompatActivity() {
         val nameInput = findViewById<EditText>(R.id.etName)
         val tvBirthdate = findViewById<TextView>(R.id.tvBirthdate)
         val registerButton = findViewById<Button>(R.id.btnRegister)
+        val btnParent = findViewById<Button>(R.id.btnParent)
+        val btnChild = findViewById<Button>(R.id.btnChild)
         val prefs = getSharedPreferences("user_data", MODE_PRIVATE)
 
-        // Выбор даты рождения
+        // 🔹 Выбор типа аккаунта
+        btnParent.setOnClickListener {
+            selectedRole = "parent"
+            highlightSelected(btnParent, btnChild)
+        }
+
+        btnChild.setOnClickListener {
+            selectedRole = "child"
+            highlightSelected(btnChild, btnParent)
+        }
+
+        // 🔹 Выбор даты рождения
         tvBirthdate.setOnClickListener {
             val calendar = Calendar.getInstance()
-            val today = Calendar.getInstance() // текущая дата
+            val today = Calendar.getInstance()
 
             val datePickerDialog = DatePickerDialog(
                 this,
@@ -43,7 +58,6 @@ class RegisterActivity : AppCompatActivity() {
                     selectedDateCalendar.set(year, month, dayOfMonth)
 
                     if (selectedDateCalendar.after(today)) {
-                        // Ошибка при выборе будущей даты
                         tvBirthdate.error = "Дата не может быть из будущего"
                         tvBirthdate.text = "Выберите дату рождения"
                         return@DatePickerDialog
@@ -51,7 +65,7 @@ class RegisterActivity : AppCompatActivity() {
 
                     val selectedDate = "$dayOfMonth/${month + 1}/$year"
                     tvBirthdate.text = selectedDate
-                    tvBirthdate.error = null // убираем ошибку
+                    tvBirthdate.error = null
                 },
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
@@ -61,34 +75,45 @@ class RegisterActivity : AppCompatActivity() {
             datePickerDialog.show()
         }
 
-        // Кнопка регистрации
+        // 🔹 Кнопка регистрации
         registerButton.setOnClickListener {
             val name = nameInput.text.toString()
             val birthdate = tvBirthdate.text.toString()
 
-            // Проверка имени
             if (name.isEmpty()) {
                 nameInput.error = "Введите имя"
                 return@setOnClickListener
             }
 
-            // Проверка даты рождения
             if (birthdate == "Выберите дату рождения") {
                 tvBirthdate.error = "Выберите дату рождения"
                 return@setOnClickListener
             }
 
-            // Сохранение данных
+            if (selectedRole == null) {
+                Toast.makeText(this, "Выберите тип аккаунта", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             prefs.edit().apply {
                 putBoolean("is_registered", true)
                 putString("user_name", name)
                 putString("user_birthdate", birthdate)
+                putString("account_type", selectedRole)
                 apply()
             }
 
-            // Переход на MainActivity
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }
+    }
+
+    // Меняет цвет выделенной кнопки
+    private fun highlightSelected(selected: Button, other: Button) {
+        val selectedColor = ContextCompat.getColor(this, android.R.color.holo_green_light)
+        val defaultColor = ContextCompat.getColor(this, android.R.color.darker_gray)
+
+        selected.setBackgroundColor(selectedColor)
+        other.setBackgroundColor(defaultColor)
     }
 }
