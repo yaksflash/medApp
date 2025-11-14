@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">MedApp</string>
+
+    <string-array name="user_list_placeholder">
+        <item>Я</item>
+        <item>Ребёнок</item>
+    </string-array>
+
 </resources>

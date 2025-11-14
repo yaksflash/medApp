@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.medapp.R
@@ -35,15 +34,21 @@ class RegisterActivity : AppCompatActivity() {
         val btnChild = findViewById<Button>(R.id.btnChild)
         val prefs = getSharedPreferences("user_data", MODE_PRIVATE)
 
-        // 🔹 Выбор типа аккаунта
+        // 🔹 Изначально обе кнопки не выбраны
+        btnParent.isSelected = false
+        btnChild.isSelected = false
+
+        // 🔹 Выбор типа аккаунта через isSelected
         btnParent.setOnClickListener {
             selectedRole = "parent"
-            highlightSelected(btnParent, btnChild)
+            btnParent.isSelected = true
+            btnChild.isSelected = false
         }
 
         btnChild.setOnClickListener {
             selectedRole = "child"
-            highlightSelected(btnChild, btnParent)
+            btnChild.isSelected = true
+            btnParent.isSelected = false
         }
 
         // 🔹 Выбор даты рождения
@@ -106,14 +111,5 @@ class RegisterActivity : AppCompatActivity() {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }
-    }
-
-    // Меняет цвет выделенной кнопки
-    private fun highlightSelected(selected: Button, other: Button) {
-        val selectedColor = ContextCompat.getColor(this, android.R.color.holo_green_light)
-        val defaultColor = ContextCompat.getColor(this, android.R.color.darker_gray)
-
-        selected.setBackgroundColor(selectedColor)
-        other.setBackgroundColor(defaultColor)
     }
 }

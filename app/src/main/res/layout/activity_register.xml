@@ -6,7 +6,10 @@
     android:id="@+id/register_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="16dp"
     tools:context=".activities.RegisterActivity">
 
     <!-- Заголовок -->
@@ -20,8 +23,7 @@
         android:gravity="center"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="24dp" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Метка: имя -->
     <TextView
@@ -43,7 +45,9 @@
         app:layout_constraintTop_toBottomOf="@id/tvNameLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:background="@android:drawable/edit_text" />
 
     <!-- Метка: возраст -->
     <TextView
@@ -55,10 +59,10 @@
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="16dp" />
 
-    <!-- Поле ввода: возраст -->
+    <!-- Поле ввода: дата рождения -->
     <TextView
         android:id="@+id/tvBirthdate"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Выберите дату рождения"
         android:padding="12dp"
@@ -66,7 +70,8 @@
         android:textColor="@android:color/black"
         app:layout_constraintTop_toBottomOf="@id/tvAgeLabel"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp" />
 
     <!-- Кнопки выбора типа аккаунта -->
     <LinearLayout
@@ -77,27 +82,31 @@
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tvBirthdate">
+        app:layout_constraintTop_toBottomOf="@+id/tvBirthdate"
+        android:layout_marginTop="16dp">
 
         <Button
             android:id="@+id/btnParent"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Родитель" />
-
-        <Space
-            android:layout_width="8dp"
-            android:layout_height="wrap_content" />
+            android:text="Родитель"
+            android:background="@drawable/account_type_selector"
+            android:textColor="@drawable/account_type_text_color"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
 
         <Button
             android:id="@+id/btnChild"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Ребёнок" />
+            android:text="Ребёнок"
+            android:background="@drawable/account_type_selector"
+            android:textColor="@drawable/account_type_text_color"
+            android:padding="12dp"
+            android:layout_marginStart="4dp"/>
     </LinearLayout>
-
 
     <!-- Кнопка регистрации -->
     <Button
@@ -107,6 +116,8 @@
         android:text="Зарегистрироваться"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/accountTypeGroup" />
+        app:layout_constraintTop_toBottomOf="@+id/accountTypeGroup"
+        android:layout_marginTop="24dp"
+        android:padding="12dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

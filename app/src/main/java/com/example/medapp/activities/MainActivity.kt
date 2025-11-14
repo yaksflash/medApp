@@ -1,5 +1,7 @@
 package com.example.medapp.activities
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -9,23 +11,34 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.medapp.R
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
+
+    private val NOTIFICATION_PERMISSION_CODE = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
-        // Подгонка под systemBars
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+        // Запрос разрешения на уведомления для Android 13+
+        checkAndRequestNotificationPermission()
+
+        // Настраиваем паддинги под systemBars
+        val mainLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.main)
+        ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
+        // Получаем роль пользователя
         val prefs = getSharedPreferences("user_data", MODE_PRIVATE)
-        val role = prefs.getString("account_type", "child")
+        val role = prefs.getString("account_type", null) ?: "child"
 
+        // Навигация
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
@@ -33,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         bottomNav.setupWithNavController(navController)
 
-        // 🔹 Настраиваем граф навигации под роль
+        // Настраиваем граф навигации под роль
         val graphInflater = navController.navInflater
         val graph = if (role == "parent") {
             graphInflater.inflate(R.navigation.nav_graph_parent)
@@ -42,10 +55,41 @@ class MainActivity : AppCompatActivity() {
         }
         navController.graph = graph
 
-        // 🔹 Скрываем ненужные кнопки меню
+        // Скрываем элементы меню безопасно
         if (role == "child") {
-            bottomNav.menu.removeItem(R.id.familyFragment)
-            bottomNav.menu.removeItem(R.id.catalogFragment)
+            bottomNav.menu.findItem(R.id.familyFragment)?.isVisible = false
+            bottomNav.menu.findItem(R.id.catalogFragment)?.isVisible = false
+        }
+    }
+
+    private fun checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_CODE
+                )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Разрешение получено, можно планировать уведомления
+            } else {
+                // Разрешение отклонено, уведомления работать не будут
+            }
         }
     }
 }
