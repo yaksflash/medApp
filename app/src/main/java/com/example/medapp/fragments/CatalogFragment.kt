@@ -18,10 +18,9 @@ import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Medicine
 import com.example.medapp.models.Reminder
 import com.example.medapp.repositories.MedicineRepository
-import com.example.medapp.utils.scheduleNotification
+import com.example.medapp.utils.ReminderScheduler
 import kotlinx.coroutines.launch
 import java.util.*
-import com.example.medapp.utils.ReminderScheduler
 
 class CatalogFragment : Fragment() {
 
@@ -44,29 +43,29 @@ class CatalogFragment : Fragment() {
         val daysOfWeek = listOf("Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье")
 
         val childrenDao = AppDatabase.getDatabase(requireContext()).childDao()
+        val prefs = requireContext().getSharedPreferences("user_data", 0)
+        val currentUserName = prefs.getString("user_name", "Я") ?: "Я"
 
         lifecycleScope.launch {
             val children = childrenDao.getAll()
             val users = mutableListOf<String>()
-            users.add("Я")
+            users.add(currentUserName) // вместо "Я" — текущее имя
             users.addAll(children.map { it.name })
 
             val adapterSpinner = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, users)
             adapterSpinner.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerUser.adapter = adapterSpinner
 
-            // Обновляем инструкцию при выборе пользователя
             spinnerUser.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                     val selectedName = users[position]
-                    val age = if (selectedName == "Я") {
+                    val age = if (selectedName == currentUserName) {
                         userAge
                     } else {
                         val child = children.firstOrNull { it.name == selectedName }
                         child?.let { getAge(it.birthDate) } ?: userAge
                     }
                 }
-
                 override fun onNothingSelected(parent: AdapterView<*>) {}
             }
         }
@@ -152,7 +151,6 @@ class CatalogFragment : Fragment() {
                                 medicineName = reminder.medicineName,
                                 user = reminder.user
                             )
-
                         }
                     }
                 }

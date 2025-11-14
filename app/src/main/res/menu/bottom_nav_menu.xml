@@ -2,19 +2,24 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/catalogFragment"
+        android:icon="@drawable/search"
         android:title="Каталог" />
 
     <item
             android:id="@+id/homeFragment"
+        android:icon="@drawable/movie"
             android:title="Главная" />
     <item
             android:id="@+id/calendarFragment"
+        android:icon="@drawable/alert"
             android:title="Календарь" />
     <item
             android:id="@+id/familyFragment"
+        android:icon="@drawable/masks"
             android:title="Семья" />
     <item
         android:id="@+id/profileFragment"
+        android:icon="@drawable/setting"
         android:title="Профиль" />
 
 </menu>

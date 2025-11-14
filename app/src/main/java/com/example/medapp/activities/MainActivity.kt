@@ -23,10 +23,8 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
-        // Запрос разрешения на уведомления для Android 13+
         checkAndRequestNotificationPermission()
 
-        // Настраиваем паддинги под systemBars
         val mainLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.main)
         ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -34,11 +32,9 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // Получаем роль пользователя
         val prefs = getSharedPreferences("user_data", MODE_PRIVATE)
         val role = prefs.getString("account_type", null) ?: "child"
 
-        // Навигация
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
@@ -46,7 +42,6 @@ class MainActivity : AppCompatActivity() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         bottomNav.setupWithNavController(navController)
 
-        // Настраиваем граф навигации под роль
         val graphInflater = navController.navInflater
         val graph = if (role == "parent") {
             graphInflater.inflate(R.navigation.nav_graph_parent)
@@ -55,7 +50,6 @@ class MainActivity : AppCompatActivity() {
         }
         navController.graph = graph
 
-        // Скрываем элементы меню безопасно
         if (role == "child") {
             bottomNav.menu.findItem(R.id.familyFragment)?.isVisible = false
             bottomNav.menu.findItem(R.id.catalogFragment)?.isVisible = false
@@ -86,9 +80,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == NOTIFICATION_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Разрешение получено, можно планировать уведомления
-            } else {
-                // Разрешение отклонено, уведомления работать не будут
+                // Разрешение получено, уведомления могут ставиться
             }
         }
     }

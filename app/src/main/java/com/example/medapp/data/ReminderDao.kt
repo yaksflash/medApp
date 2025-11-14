@@ -20,4 +20,8 @@ interface ReminderDao {
 
     @Query("SELECT * FROM reminders WHERE user = :user ORDER BY dayOfWeek, time")
     suspend fun getAllForUser(user: String): List<Reminder>
+
+    @Query("DELETE FROM reminders WHERE user = :childName")
+    suspend fun deleteForUser(childName: String)
+
 }

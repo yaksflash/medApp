@@ -42,6 +42,7 @@ object ReminderScheduler {
             putExtra("medicineName", medicineName)
             putExtra("user", user)
             putExtra("time", time)
+            putExtra("dayOfWeek", dayOfWeek)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

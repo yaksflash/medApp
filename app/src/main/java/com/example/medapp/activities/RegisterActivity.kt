@@ -38,18 +38,30 @@ class RegisterActivity : AppCompatActivity() {
         btnParent.isSelected = false
         btnChild.isSelected = false
 
-        // 🔹 Выбор типа аккаунта через isSelected
+        val defaultColor = android.graphics.Color.parseColor("#BDBDBD") // серый
+        val selectedColor = android.graphics.Color.parseColor("#4CAF50") // зелёный
+
+        btnParent.backgroundTintList = android.content.res.ColorStateList.valueOf(defaultColor)
+        btnChild.backgroundTintList = android.content.res.ColorStateList.valueOf(defaultColor)
+
         btnParent.setOnClickListener {
             selectedRole = "parent"
             btnParent.isSelected = true
             btnChild.isSelected = false
+
+            btnParent.backgroundTintList = android.content.res.ColorStateList.valueOf(selectedColor)
+            btnChild.backgroundTintList = android.content.res.ColorStateList.valueOf(defaultColor)
         }
 
         btnChild.setOnClickListener {
             selectedRole = "child"
             btnChild.isSelected = true
             btnParent.isSelected = false
+
+            btnChild.backgroundTintList = android.content.res.ColorStateList.valueOf(selectedColor)
+            btnParent.backgroundTintList = android.content.res.ColorStateList.valueOf(defaultColor)
         }
+
 
         // 🔹 Выбор даты рождения
         tvBirthdate.setOnClickListener {

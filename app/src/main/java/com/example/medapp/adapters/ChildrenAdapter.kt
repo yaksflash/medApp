@@ -3,6 +3,7 @@ package com.example.medapp.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.medapp.R
@@ -11,12 +12,16 @@ import java.util.*
 
 class ChildrenAdapter(
     private val children: List<Child>,
-    private val onItemClick: (Child) -> Unit
+    private val onItemClick: (Child) -> Unit,
+    private val onDeleteClick: (Child) -> Unit,
+    private val onQRClick: (Child) -> Unit // колбэк для кнопки QR
 ) : RecyclerView.Adapter<ChildrenAdapter.ChildViewHolder>() {
 
     inner class ChildViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val tvName: TextView = itemView.findViewById(R.id.tvChildName)
-        val tvAge: TextView = itemView.findViewById(R.id.tvChildBirthdate) // переиспользуем TextView для возраста
+        val tvAge: TextView = itemView.findViewById(R.id.tvChildBirthdate)
+        val btnDelete: Button = itemView.findViewById(R.id.btnDeleteChild)
+        val btnQR: Button = itemView.findViewById(R.id.btnQR)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChildViewHolder {
@@ -28,8 +33,11 @@ class ChildrenAdapter(
     override fun onBindViewHolder(holder: ChildViewHolder, position: Int) {
         val child = children[position]
         holder.tvName.text = child.name
-        holder.tvAge.text = "Возраст: ${getAge(child.birthDate)} лет" // показываем возраст
+        holder.tvAge.text = "Возраст: ${getAge(child.birthDate)} лет"
+
         holder.itemView.setOnClickListener { onItemClick(child) }
+        holder.btnDelete.setOnClickListener { onDeleteClick(child) }
+        holder.btnQR.setOnClickListener { onQRClick(child) }
     }
 
     override fun getItemCount(): Int = children.size

@@ -46,10 +46,13 @@ class CalendarFragment : Fragment() {
     }
 
     private fun loadReminders() {
+        val prefs = requireContext().getSharedPreferences("user_data", 0)
+        val currentUser = prefs.getString("user_name", "") ?: ""
+
         lifecycleScope.launch {
             val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
             val reminders: List<Reminder> = withContext(Dispatchers.IO) {
-                dao.getAllForUser("Я") // только для себя
+                dao.getAllForUser(currentUser)
             }
             displayReminders(reminders)
         }
@@ -63,7 +66,6 @@ class CalendarFragment : Fragment() {
             val dayReminders = reminders.filter { it.dayOfWeek == dayNum }
             if (dayReminders.isEmpty()) continue
 
-            // Заголовок дня
             val dayTextView = TextView(requireContext()).apply {
                 text = dayName
                 textSize = 18f
@@ -71,7 +73,6 @@ class CalendarFragment : Fragment() {
             }
             calendarContainer.addView(dayTextView)
 
-            // Список уведомлений
             for (r in dayReminders) {
                 val reminderLayout = LinearLayout(requireContext()).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -91,9 +92,7 @@ class CalendarFragment : Fragment() {
                     text = "-"
                     setOnClickListener {
                         lifecycleScope.launch {
-                            // Удаляем из базы
                             dao.delete(r)
-                            // Удаляем из интерфейса
                             calendarContainer.removeView(reminderLayout)
                         }
                     }

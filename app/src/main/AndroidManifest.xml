@@ -1,12 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Разрешение для точных будильников (Android 12+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-
-    <!-- Разрешение для получения события перезагрузки устройства -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -16,7 +13,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MedApp">
 
-        <!-- Splash экран -->
         <activity
             android:name=".activities.SplashActivity"
             android:exported="true">
@@ -26,24 +22,22 @@
             </intent-filter>
         </activity>
 
-        <!-- Экран регистрации -->
         <activity
             android:name=".activities.RegisterActivity"
             android:exported="false" />
 
-        <!-- Основной экран -->
         <activity
             android:name=".activities.MainActivity"
             android:exported="false" />
 
-        <!-- Ресивер для уведомлений -->
+        <!-- Receiver для уведомлений -->
         <receiver
             android:name=".receivers.ReminderReceiver"
-            android:exported="false" />
+            android:exported="true" />
 
-        <!-- Ресивер для восстановления уведомлений после перезагрузки -->
+        <!-- Receiver для восстановления после перезагрузки -->
         <receiver
-            android:name=".utils.BootReceiver"
+            android:name=".receivers.BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -52,5 +46,4 @@
         </receiver>
 
     </application>
-
 </manifest>

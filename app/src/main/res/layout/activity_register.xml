@@ -91,10 +91,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Родитель"
-            android:background="@drawable/account_type_selector"
-            android:textColor="@drawable/account_type_text_color"
             android:padding="12dp"
-            android:layout_marginEnd="4dp"/>
+            android:layout_marginEnd="4dp"
+            android:backgroundTint="@color/gray" />
 
         <Button
             android:id="@+id/btnChild"
@@ -102,10 +101,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Ребёнок"
-            android:background="@drawable/account_type_selector"
-            android:textColor="@drawable/account_type_text_color"
             android:padding="12dp"
-            android:layout_marginStart="4dp"/>
+            android:layout_marginStart="4dp"
+            android:backgroundTint="@color/gray" />
     </LinearLayout>
 
     <!-- Кнопка регистрации -->

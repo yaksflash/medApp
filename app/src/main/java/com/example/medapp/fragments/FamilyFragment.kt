@@ -15,7 +15,6 @@ import com.example.medapp.R
 import com.example.medapp.adapters.ChildrenAdapter
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Child
-import com.example.medapp.models.Reminder
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -39,10 +38,12 @@ class FamilyFragment : Fragment() {
         rvChildren = view.findViewById(R.id.rvChildren)
         btnAddChild = view.findViewById(R.id.btnAddChild)
 
-        // Адаптер: отображаем возраст вместо даты рождения
-        childrenAdapter = ChildrenAdapter(childrenList) { child ->
-            showChildReminders(child)
-        }
+        childrenAdapter = ChildrenAdapter(
+            childrenList,
+            onItemClick = { child -> showChildReminders(child) },
+            onDeleteClick = { child -> confirmDeleteChild(child) },
+            onQRClick = { child -> showChildQR(child) } // QR
+        )
 
         rvChildren.layoutManager = LinearLayoutManager(requireContext())
         rvChildren.adapter = childrenAdapter
@@ -103,6 +104,23 @@ class FamilyFragment : Fragment() {
                         AppDatabase.getDatabase(requireContext()).childDao().insert(child)
                         loadChildren()
                     }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun confirmDeleteChild(child: Child) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Удалить ребенка?")
+            .setMessage("Вы уверены, что хотите удалить ${child.name} и все его напоминания?")
+            .setPositiveButton("Удалить") { dialog, _ ->
+                lifecycleScope.launch {
+                    val db = AppDatabase.getDatabase(requireContext())
+                    db.reminderDao().deleteForUser(child.name)
+                    db.childDao().delete(child)
+                    loadChildren()
                 }
                 dialog.dismiss()
             }
@@ -173,5 +191,63 @@ class FamilyFragment : Fragment() {
             (today.get(Calendar.MONTH) + 1 == month && today.get(Calendar.DAY_OF_MONTH) < day)
         ) age -= 1
         return age
+    }
+
+    // ---------------------- QR ----------------------
+    private fun showChildQR(child: Child) {
+        val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
+        lifecycleScope.launch {
+            val reminders = reminderDao.getAllForUser(child.name)
+            val jsonMap = mapOf(
+                "name" to child.name,
+                "birthDate" to child.birthDate,
+                "reminders" to reminders.map { r ->
+                    mapOf(
+                        "medicineName" to r.medicineName,
+                        "time" to r.time,
+                        "dayOfWeek" to r.dayOfWeek
+                    )
+                }
+            )
+            val jsonString = com.google.gson.Gson().toJson(jsonMap)
+
+            val qrBitmap = generateQR(jsonString)
+            showQRDialog(qrBitmap)
+        }
+    }
+
+    private fun generateQR(data: String): android.graphics.Bitmap {
+        val size = 512
+        val hints = mapOf(
+            com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8", // важно
+            com.google.zxing.EncodeHintType.MARGIN to 1
+        )
+
+        val bitMatrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+            data,
+            com.google.zxing.BarcodeFormat.QR_CODE,
+            size,
+            size,
+            hints
+        )
+
+        val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bmp.setPixel(x, y, if (bitMatrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            }
+        }
+        return bmp
+    }
+
+
+    private fun showQRDialog(qr: android.graphics.Bitmap) {
+        val imageView = ImageView(requireContext())
+        imageView.setImageBitmap(qr)
+        AlertDialog.Builder(requireContext())
+            .setTitle("QR для синхронизации")
+            .setView(imageView)
+            .setPositiveButton("Закрыть", null)
+            .show()
     }
 }
