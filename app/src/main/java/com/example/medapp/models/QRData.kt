@@ -7,5 +7,6 @@ data class QRData(
 data class QRReminder(
     val medicineName: String,
     val dayOfWeek: Int,
-    val time: String
+    val time: String,
+    val note: String? = null
 )

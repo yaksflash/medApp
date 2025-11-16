@@ -27,6 +27,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val reminderId = intent.getIntExtra("reminderId", 0)
         val dayOfWeek = intent.getIntExtra("dayOfWeek", 1)
         val ownerId = intent.getIntExtra("ownerId", -1)
+        val note = intent.getStringExtra("note") // <-- новая заметка
 
         CoroutineScope(Dispatchers.IO).launch {
             val db = AppDatabase.getDatabase(context)
@@ -35,24 +36,21 @@ class ReminderReceiver : BroadcastReceiver() {
             // Получаем данные текущего пользователя
             val prefs = context.getSharedPreferences("user_data", 0)
             val currentAccountType = prefs.getString("account_type", "parent") ?: "parent"
-            val currentUserName = prefs.getString("user_name", "Родитель") ?: "Родитель"
 
+            // Формируем текст уведомления
             val contentText = when (currentAccountType) {
                 "child" -> {
-                    // Ребёнок — просто лекарство и время
-                    "$medicineName в $time"
+                    "$medicineName в $time" + if (!note.isNullOrEmpty()) " 📝 $note" else ""
                 }
                 "parent" -> {
                     if (ownerId == -1) {
-                        // Напоминание для родителя
-                        "$medicineName для Вас в $time"
+                        "$medicineName для Вас в $time" + if (!note.isNullOrEmpty()) " 📝 $note" else ""
                     } else {
-                        // Напоминание для ребёнка
                         val ownerName = childDao.getChildById(ownerId)?.name ?: "Ребёнок"
-                        "$medicineName для $ownerName в $time"
+                        "$medicineName для $ownerName в $time" + if (!note.isNullOrEmpty()) " 📝 $note" else ""
                     }
                 }
-                else -> "$medicineName в $time"
+                else -> "$medicineName в $time" + if (!note.isNullOrEmpty()) " 📝 $note" else ""
             }
 
             withContext(Dispatchers.Main) {
@@ -86,14 +84,15 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 notificationManager.notify(reminderId, notification)
 
-                // Перезапланируем на следующую неделю
+                // Перезапланируем на следующую неделю, передавая заметку
                 ReminderScheduler.scheduleWeeklyReminder(
-                    context,
-                    reminderId,
-                    dayOfWeek,
-                    time,
-                    medicineName,
-                    ownerId
+                    context = context,
+                    reminderId = reminderId,
+                    dayOfWeek = dayOfWeek,
+                    time = time,
+                    medicineName = medicineName,
+                    ownerId = ownerId,
+                    note = note // <-- передаём заметку
                 )
             }
         }

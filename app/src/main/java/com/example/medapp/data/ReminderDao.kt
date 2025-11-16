@@ -29,4 +29,9 @@ interface ReminderDao {
     // Удаление всех напоминаний для конкретного владельца
     @Query("DELETE FROM reminders WHERE ownerId = :ownerId")
     suspend fun deleteForOwner(ownerId: Int)
+
+    // Получение конкретного напоминания по ID
+    @Query("SELECT * FROM reminders WHERE id = :id")
+    suspend fun getReminderById(id: Int): Reminder?
+
 }

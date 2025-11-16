@@ -14,9 +14,12 @@ import com.example.medapp.R
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Reminder
 import com.example.medapp.utils.ReminderScheduler
+import com.example.medapp.repositories.MedicineRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.*
+import android.widget.EditText
 
 class CalendarFragment : Fragment() {
 
@@ -49,24 +52,24 @@ class CalendarFragment : Fragment() {
     private fun loadReminders() {
         val prefs = requireContext().getSharedPreferences("user_data", 0)
         val currentOwnerId = prefs.getInt("owner_id", -1)
-        val accountType = prefs.getString("account_type", "child")
+        val accountType = prefs.getString("account_type", "child") ?: "child"
 
         lifecycleScope.launch {
             val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
             val childDao = AppDatabase.getDatabase(requireContext()).childDao()
+            val reminders = withContext(Dispatchers.IO) { reminderDao.getAllForOwner(currentOwnerId) }
+            val medicines = MedicineRepository.loadMedicines(requireContext())
 
-            val reminders = withContext(Dispatchers.IO) {
-                reminderDao.getAllForOwner(currentOwnerId)
-            }
-
-            displayReminders(reminders, childDao, accountType ?: "child")
+            displayReminders(reminders, childDao, accountType, currentOwnerId, medicines)
         }
     }
 
     private fun displayReminders(
         reminders: List<Reminder>,
         childDao: com.example.medapp.data.ChildDao,
-        accountType: String
+        accountType: String,
+        currentUserId: Int,
+        medicines: List<com.example.medapp.models.Medicine>
     ) {
         calendarContainer.removeAllViews()
 
@@ -83,29 +86,58 @@ class CalendarFragment : Fragment() {
                 calendarContainer.addView(dayTextView)
 
                 for (reminder in dayReminders) {
-                    val ownerName = withContext(Dispatchers.IO) {
-                        if (reminder.ownerId == -1) "Родитель"
-                        else childDao.getChildById(reminder.ownerId)?.name ?: "Ребёнок"
-                    }
-
-                    val reminderTextView = TextView(requireContext()).apply {
+                    val tv = TextView(requireContext()).apply {
                         text = "${reminder.medicineName} - ${reminder.time}"
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        )
                         setPadding(16, 8, 16, 8)
                         setBackgroundResource(R.drawable.reminder_item_bg)
+                        isClickable = true
+                        isFocusable = true
                     }
 
-                    // Если аккаунт не child, включаем редактирование
-                    if (accountType != "child") {
-                        reminderTextView.setOnClickListener {
-                            showEditDialog(reminder, reminderTextView)
+                    tv.setOnClickListener {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val prefs = requireContext().getSharedPreferences("user_data", 0)
+                            val birthdate = if (reminder.ownerId == currentUserId) {
+                                prefs.getString("user_birthdate", null)
+                            } else {
+                                childDao.getChildById(reminder.ownerId)?.birthDate
+                            }
+
+                            val age = birthdate?.let {
+                                val parts = it.split("/").map { it.toInt() }
+                                val today = Calendar.getInstance()
+                                var a = today.get(Calendar.YEAR) - parts[2]
+                                if (today.get(Calendar.MONTH) + 1 < parts[1] ||
+                                    (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
+                                ) a -= 1
+                                a
+                            } ?: 0
+
+                            val medicine = MedicineRepository.findMedicineByName(medicines, reminder.medicineName)
+                            val instructionText = medicine?.let { MedicineRepository.getInstructionForAge(it, age) }.orEmpty()
+                            val noteText = reminder.note?.takeIf { it.isNotBlank() } ?: "Заметка отсутствует"
+
+                            withContext(Dispatchers.Main) {
+                                if (accountType == "child") {
+                                    // Ребенок видит только информацию
+                                    val message = buildString {
+                                        if (instructionText.isNotEmpty()) append("Инструкция: $instructionText\n\n")
+                                        append("Заметка: $noteText")
+                                    }
+                                    AlertDialog.Builder(requireContext())
+                                        .setTitle("${reminder.medicineName} - ${reminder.time}")
+                                        .setMessage(message)
+                                        .setPositiveButton("ОК", null)
+                                        .show()
+                                } else {
+                                    // Родитель — редактирование
+                                    showEditDialog(reminder, tv)
+                                }
+                            }
                         }
                     }
 
-                    calendarContainer.addView(reminderTextView)
+                    calendarContainer.addView(tv)
                 }
             }
         }
@@ -114,7 +146,14 @@ class CalendarFragment : Fragment() {
     private fun showEditDialog(reminder: Reminder, textView: TextView) {
         val builder = AlertDialog.Builder(requireContext())
         builder.setTitle("${reminder.medicineName} - ${reminder.time}")
-        builder.setMessage("Выберите действие:")
+
+        val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val noteInput = EditText(requireContext()).apply {
+            hint = "Заметка"
+            setText(reminder.note)
+        }
+        layout.addView(noteInput)
+        builder.setView(layout)
 
         builder.setNeutralButton("Изменить время") { _, _ ->
             val parts = reminder.time.split(":").map { it.toIntOrNull() ?: 0 }
@@ -125,14 +164,10 @@ class CalendarFragment : Fragment() {
                 val newTime = String.format("%02d:%02d", h, m)
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
-                        // Отменяем старое уведомление
                         ReminderScheduler.cancelReminder(requireContext(), reminder.id)
-
-                        // Сохраняем новое время в базе
                         reminder.time = newTime
                         AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
                     }
-                    // Ставим новое уведомление
                     ReminderScheduler.scheduleWeeklyReminder(
                         context = requireContext(),
                         reminderId = reminder.id,
@@ -141,26 +176,33 @@ class CalendarFragment : Fragment() {
                         medicineName = reminder.medicineName,
                         ownerId = reminder.ownerId
                     )
-                    // Обновляем UI
                     textView.text = "${reminder.medicineName} - ${reminder.time}"
                 }
             }, hour, minute, true).show()
         }
 
+        builder.setPositiveButton("Сохранить заметку") { _, _ ->
+            val newNote = noteInput.text.toString()
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) {
+                    reminder.note = newNote
+                    AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
+                }
+            }
+        }
+
         builder.setNegativeButton("Удалить") { _, _ ->
             lifecycleScope.launch {
                 withContext(Dispatchers.IO) {
-                    // Удаляем напоминание из базы
                     AppDatabase.getDatabase(requireContext()).reminderDao().delete(reminder)
                 }
-                // Отменяем уведомление
                 ReminderScheduler.cancelReminder(requireContext(), reminder.id)
-                // Обновляем UI
                 loadReminders()
             }
         }
 
-        builder.setPositiveButton("Отмена", null)
+        builder.setOnCancelListener { } // Можно оставить для отмены
+
         builder.show()
     }
 }

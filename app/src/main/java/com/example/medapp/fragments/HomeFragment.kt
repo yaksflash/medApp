@@ -11,15 +11,16 @@ import androidx.lifecycle.lifecycleScope
 import com.example.medapp.R
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Reminder
+import com.example.medapp.models.QRData
+import com.example.medapp.models.QRReminder
 import com.example.medapp.utils.ReminderScheduler
+import com.example.medapp.repositories.MedicineRepository
 import com.google.gson.GsonBuilder
 import com.google.zxing.integration.android.IntentIntegrator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
-import com.example.medapp.models.QRData
-import com.example.medapp.models.QRReminder
 
 class HomeFragment : Fragment(R.layout.fragment_home) {
 
@@ -48,6 +49,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         integrator.setCameraId(0)
         integrator.setBeepEnabled(true)
         integrator.setBarcodeImageEnabled(true)
+        integrator.setOrientationLocked(true)
         qrLauncher.launch(integrator.createScanIntent())
     }
 
@@ -78,17 +80,21 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val db = AppDatabase.getDatabase(requireContext())
                 val reminderDao = db.reminderDao()
 
+                // Отменяем старые уведомления
                 val oldReminders = reminderDao.getAllForOwner(currentChildId)
                 oldReminders.forEach { ReminderScheduler.cancelReminder(requireContext(), it.id) }
 
+                // Удаляем старые напоминания
                 reminderDao.deleteForOwner(currentChildId)
 
-                remindersList.forEach { r ->
+                // Сохраняем новые из QR
+                remindersList.forEach { r: QRReminder ->
                     val reminder = Reminder(
                         ownerId = currentChildId,
                         medicineName = r.medicineName,
                         time = r.time,
-                        dayOfWeek = r.dayOfWeek
+                        dayOfWeek = r.dayOfWeek,
+                        note = r.note
                     )
                     val id = reminderDao.insert(reminder).toInt()
 
@@ -98,7 +104,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                         dayOfWeek = reminder.dayOfWeek,
                         time = reminder.time,
                         medicineName = reminder.medicineName,
-                        ownerId = reminder.ownerId
+                        ownerId = reminder.ownerId,
+                        note = reminder.note
                     )
                 }
 
@@ -138,27 +145,25 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             val itemsToShow = mutableListOf<Pair<String, List<Reminder>>>()
 
             if (accountType == "child") {
-
                 val reminders = reminderDao.getAllForOwner(currentUserId)
                     .filter { it.dayOfWeek == adjustedDay }
-
                 itemsToShow.add("Ваши напоминания" to reminders)
 
             } else { // parent
-
                 val parentReminders = reminderDao.getAllForOwner(-1)
                     .filter { it.dayOfWeek == adjustedDay }
-
                 itemsToShow.add("Ваши лекарства" to parentReminders)
 
                 val children = childDao.getAll()
                 for (child in children) {
                     val childRem = reminderDao.getAllForOwner(child.id)
                         .filter { it.dayOfWeek == adjustedDay }
-
                     itemsToShow.add("Для ${child.name}" to childRem)
                 }
             }
+
+            // Загружаем лекарства для инструкций
+            val medicines = MedicineRepository.loadMedicines(requireContext())
 
             withContext(Dispatchers.Main) {
                 itemsToShow.forEach { (title, reminders) ->
@@ -174,9 +179,48 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                             text = "${reminder.medicineName} - ${reminder.time}"
                             setPadding(16, 8, 16, 8)
                             setBackgroundResource(R.drawable.reminder_item_bg)
-                            isClickable = false
-                            isFocusable = false
+                            isClickable = true
+                            isFocusable = true
                         }
+
+                        tv.setOnClickListener {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                // Определяем возраст пользователя, которому принадлежит напоминание
+                                val birthdate = if (reminder.ownerId == currentUserId) {
+                                    prefs.getString("user_birthdate", null)
+                                } else {
+                                    childDao.getChildById(reminder.ownerId)?.birthDate
+                                }
+
+                                val age = birthdate?.let { birth ->
+                                    val parts = birth.split("/").map { it.toInt() }
+                                    val today = Calendar.getInstance()
+                                    var a = today.get(Calendar.YEAR) - parts[2]
+                                    if (today.get(Calendar.MONTH) + 1 < parts[1] ||
+                                        (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
+                                    ) a -= 1
+                                    a
+                                } ?: 0
+
+                                val medicine = MedicineRepository.findMedicineByName(medicines, reminder.medicineName)
+                                val instructionText = medicine?.let { MedicineRepository.getInstructionForAge(it, age) }.orEmpty()
+                                val noteText = reminder.note?.takeIf { it.isNotBlank() } ?: "Нет заметки"
+
+                                withContext(Dispatchers.Main) {
+                                    val message = buildString {
+                                        if (instructionText.isNotEmpty()) append("Инструкция: $instructionText\n\n")
+                                        append("Заметка: $noteText")
+                                    }
+
+                                    AlertDialog.Builder(requireContext())
+                                        .setTitle("${reminder.medicineName} - ${reminder.time}")
+                                        .setMessage(message)
+                                        .setPositiveButton("ОК", null)
+                                        .show()
+                                }
+                            }
+                        }
+
                         container.addView(tv)
                     }
                 }

@@ -154,17 +154,15 @@ class FamilyFragment : Fragment() {
 
                     dayReminders.forEach { reminder ->
                         val reminderTextView = TextView(requireContext()).apply {
-                            text = "${reminder.medicineName} - ${reminder.time}"
+                            text = "${reminder.medicineName} - ${reminder.time}" // заметка не отображаем
                             setPadding(16, 8, 16, 8)
                             setBackgroundResource(R.drawable.reminder_item_bg)
                             setOnClickListener {
-                                // Диалог для редактирования/удаления напоминания
-                                showReminderEditDialog(reminder, this) // используем 'this' вместо 'tv'
+                                showReminderEditDialog(reminder, this) // заметка редактируется только здесь
                             }
                         }
                         layout.addView(reminderTextView)
                     }
-
                 }
             }
 
@@ -179,8 +177,16 @@ class FamilyFragment : Fragment() {
     private fun showReminderEditDialog(reminder: Reminder, textView: TextView) {
         val builder = AlertDialog.Builder(requireContext())
         builder.setTitle("${reminder.medicineName} - ${reminder.time}")
-        builder.setMessage("Выберите действие:")
 
+        val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val noteInput = EditText(requireContext()).apply {
+            hint = "Заметка"
+            setText(reminder.note)
+        }
+        layout.addView(noteInput)
+        builder.setView(layout)
+
+        // Изменить время
         builder.setNeutralButton("Изменить время") { _, _ ->
             val parts = reminder.time.split(":").map { it.toIntOrNull() ?: 0 }
             val hour = parts.getOrNull(0) ?: 0
@@ -190,13 +196,10 @@ class FamilyFragment : Fragment() {
                 val newTime = String.format("%02d:%02d", h, m)
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
-                        // Отменяем старое уведомление
                         ReminderScheduler.cancelReminder(requireContext(), reminder.id)
-                        // Сохраняем новое время
                         reminder.time = newTime
                         AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
                     }
-                    // Ставим новое уведомление
                     ReminderScheduler.scheduleWeeklyReminder(
                         context = requireContext(),
                         reminderId = reminder.id,
@@ -210,6 +213,18 @@ class FamilyFragment : Fragment() {
             }, hour, minute, true).show()
         }
 
+        // Сохранить заметку
+        builder.setPositiveButton("Сохранить заметку") { _, _ ->
+            val newNote = noteInput.text.toString()
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) {
+                    reminder.note = newNote
+                    AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
+                }
+            }
+        }
+
+        // Удалить напоминание
         builder.setNegativeButton("Удалить") { _, _ ->
             lifecycleScope.launch {
                 withContext(Dispatchers.IO) {
@@ -220,9 +235,16 @@ class FamilyFragment : Fragment() {
             }
         }
 
-        builder.setPositiveButton("Отмена", null)
+        // Стандартная отмена (по кнопке назад или тап вне диалога)
+        builder.setOnCancelListener {
+            // Просто закрываем диалог
+        }
+
         builder.show()
     }
+
+
+
 
     private fun getAge(birthDate: String): Int {
         val parts = birthDate.split("/").map { it.toInt() }
@@ -249,7 +271,8 @@ class FamilyFragment : Fragment() {
                     mapOf(
                         "medicineName" to r.medicineName,
                         "time" to r.time,
-                        "dayOfWeek" to r.dayOfWeek
+                        "dayOfWeek" to r.dayOfWeek,
+                        "note" to r.note
                     )
                 }
             )

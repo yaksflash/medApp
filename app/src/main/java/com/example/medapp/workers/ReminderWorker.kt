@@ -15,6 +15,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : Worker(contex
     override fun doWork(): Result {
         val medicine = inputData.getString("medicine") ?: return Result.failure()
         val ownerId = inputData.getInt("ownerId", -1)
+        val note = inputData.getString("note") // <-- новая заметка
 
         // Получаем имя пользователя/ребёнка через DAO
         val ownerName = runBlocking {
@@ -34,9 +35,11 @@ class ReminderWorker(context: Context, params: WorkerParameters) : Worker(contex
             manager.createNotificationChannel(channel)
         }
 
+        val contentText = "$ownerName нужно принять: $medicine" + if (!note.isNullOrEmpty()) " 📝 $note" else ""
+
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle("Напоминание о лекарстве")
-            .setContentText("$ownerName нужно принять: $medicine")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
             .build()

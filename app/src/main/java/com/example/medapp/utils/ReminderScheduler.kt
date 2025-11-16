@@ -8,7 +8,6 @@ import android.os.Build
 import android.provider.Settings
 import com.example.medapp.receivers.ReminderReceiver
 import java.util.*
-import com.example.medapp.data.AppDatabase
 
 object ReminderScheduler {
 
@@ -18,7 +17,8 @@ object ReminderScheduler {
         dayOfWeek: Int,
         time: String,
         medicineName: String,
-        ownerId: Int
+        ownerId: Int,
+        note: String? = null // добавляем параметр note
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -44,6 +44,7 @@ object ReminderScheduler {
             putExtra("ownerId", ownerId)
             putExtra("time", time)
             putExtra("dayOfWeek", dayOfWeek)
+            putExtra("note", note) // передаём заметку
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -71,7 +72,6 @@ object ReminderScheduler {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(pendingIntent)
     }
-
 
     private fun timeBeforeNow(calendar: Calendar) = calendar.timeInMillis < System.currentTimeMillis()
 

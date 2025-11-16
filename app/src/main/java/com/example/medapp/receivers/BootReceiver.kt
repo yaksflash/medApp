@@ -24,7 +24,8 @@ class BootReceiver : BroadcastReceiver() {
                         dayOfWeek = reminder.dayOfWeek,
                         time = reminder.time,
                         medicineName = reminder.medicineName,
-                        ownerId = reminder.ownerId   // <- новое поле
+                        ownerId = reminder.ownerId,
+                        note = reminder.note // добавляем заметку
                     )
                 }
             }

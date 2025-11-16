@@ -42,6 +42,7 @@ class CatalogFragment : Fragment() {
         val daysContainer = dialogView.findViewById<LinearLayout>(R.id.daysContainer)
         val tvInstruction = dialogView.findViewById<TextView>(R.id.tvInstruction)
         val customNameField = if (isCustom) dialogView.findViewById<EditText>(R.id.etCustomName) else null
+        val noteField = dialogView.findViewById<EditText>(R.id.etNote) // <-- поле для заметки
 
         val dayTimeMap = mutableMapOf<String, MutableList<String>>()
         val daysOfWeek = listOf("Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье")
@@ -77,7 +78,6 @@ class CatalogFragment : Fragment() {
                         } else 0
                     }
 
-                    // Получаем инструкцию лекарства по возрасту
                     val medName = if (isCustom) customNameField?.text?.toString()?.trim() ?: "" else selectedName ?: ""
                     val med = MedicineRepository.findMedicineByName(medicines, medName)
                     tvInstruction.text = med?.let { MedicineRepository.getInstructionForAge(it, age) } ?: "Инструкция недоступна"
@@ -150,6 +150,8 @@ class CatalogFragment : Fragment() {
                         selectedName ?: "Без названия"
                     }
 
+                    val noteText = noteField?.text?.toString()?.trim() // <-- читаем заметку
+
                     for ((dayName, times) in dayTimeMap) {
                         val dayOfWeek = when(dayName) {
                             "Понедельник" -> 1
@@ -167,7 +169,8 @@ class CatalogFragment : Fragment() {
                                 medicineName = medicineTitle,
                                 dayOfWeek = dayOfWeek,
                                 time = time,
-                                ownerId = selectedOwner.second
+                                ownerId = selectedOwner.second,
+                                note = if (noteText.isNullOrEmpty()) null else noteText // <-- передаём заметку
                             )
                             val id = reminderDao.insert(reminder).toInt()
                             ReminderScheduler.scheduleWeeklyReminder(
@@ -176,7 +179,8 @@ class CatalogFragment : Fragment() {
                                 dayOfWeek = reminder.dayOfWeek,
                                 time = reminder.time,
                                 medicineName = reminder.medicineName,
-                                ownerId = reminder.ownerId
+                                ownerId = reminder.ownerId,
+                                note = reminder.note // <-- передаём в scheduler
                             )
                         }
                     }

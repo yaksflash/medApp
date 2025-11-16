@@ -9,5 +9,6 @@ data class Reminder(
     val medicineName: String,
     val ownerId: Int,
     val dayOfWeek: Int,      // 1=Пн, 7=Вс
-    var time: String         // "HH:mm"
+    var time: String,         // "HH:mm"
+    var note: String? = null // новая заметка, nullable чтобы старые записи работали
 )
