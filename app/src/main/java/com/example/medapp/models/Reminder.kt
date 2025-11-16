@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class Reminder(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val medicineName: String,
-    val user: String,        // "Я" или "Ребёнок"
+    val ownerId: Int,
     val dayOfWeek: Int,      // 1=Пн, 7=Вс
-    val time: String         // "HH:mm"
+    var time: String         // "HH:mm"
 )

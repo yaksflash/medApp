@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import com.example.medapp.models.Reminder
 import com.example.medapp.models.Child
 
-@Database(entities = [Reminder::class, Child::class], version = 4)
+@Database(entities = [Reminder::class, Child::class], version = 6)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun reminderDao(): ReminderDao

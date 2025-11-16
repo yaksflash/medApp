@@ -1,27 +1,32 @@
 package com.example.medapp.data
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Delete
+import androidx.room.*
 import com.example.medapp.models.Reminder
 
 @Dao
 interface ReminderDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(reminder: Reminder): Long   // ← ВОТ ЭТО ВАЖНО
 
+    // Вставка с заменой существующей записи при конфликте (возвращает ID)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(reminder: Reminder): Long
+
+    // Обновление существующей записи
+    @Update
+    suspend fun update(reminder: Reminder)
+
+    // Удаление конкретного напоминания
     @Delete
     suspend fun delete(reminder: Reminder)
 
+    // Получение всех напоминаний
     @Query("SELECT * FROM reminders")
     suspend fun getAll(): List<Reminder>
 
-    @Query("SELECT * FROM reminders WHERE user = :user ORDER BY dayOfWeek, time")
-    suspend fun getAllForUser(user: String): List<Reminder>
+    // Получение всех напоминаний для конкретного владельца
+    @Query("SELECT * FROM reminders WHERE ownerId = :ownerId ORDER BY dayOfWeek, time")
+    suspend fun getAllForOwner(ownerId: Int): List<Reminder>
 
-    @Query("DELETE FROM reminders WHERE user = :childName")
-    suspend fun deleteForUser(childName: String)
-
+    // Удаление всех напоминаний для конкретного владельца
+    @Query("DELETE FROM reminders WHERE ownerId = :ownerId")
+    suspend fun deleteForOwner(ownerId: Int)
 }

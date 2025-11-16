@@ -44,36 +44,25 @@ class CatalogFragment : Fragment() {
 
         val childrenDao = AppDatabase.getDatabase(requireContext()).childDao()
         val prefs = requireContext().getSharedPreferences("user_data", 0)
-        val currentUserName = prefs.getString("user_name", "Я") ?: "Я"
+        val currentOwnerId = prefs.getInt("owner_id", -1)
 
         lifecycleScope.launch {
             val children = childrenDao.getAll()
-            val users = mutableListOf<String>()
-            users.add(currentUserName) // вместо "Я" — текущее имя
-            users.addAll(children.map { it.name })
+            val owners = mutableListOf<Pair<String, Int>>() // Pair<name, ownerId>
+            owners.add("Родитель" to -1)
+            owners.addAll(children.map { it.name to it.id })
 
-            val adapterSpinner = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, users)
+            val adapterSpinner = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, owners.map { it.first })
             adapterSpinner.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerUser.adapter = adapterSpinner
 
-            spinnerUser.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                    val selectedName = users[position]
-                    val age = if (selectedName == currentUserName) {
-                        userAge
-                    } else {
-                        val child = children.firstOrNull { it.name == selectedName }
-                        child?.let { getAge(it.birthDate) } ?: userAge
-                    }
-                }
-                override fun onNothingSelected(parent: AdapterView<*>) {}
-            }
+            // Сохраняем список owners для использования при сохранении
+            spinnerUser.tag = owners
         }
 
-        // Создаём UI для дней недели и добавления времени
+        // UI дни недели
         daysOfWeek.forEach { day ->
             val dayLayout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
-
             val dayLabelLayout = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL }
             val dayText = TextView(requireContext()).apply {
                 text = day
@@ -89,7 +78,7 @@ class CatalogFragment : Fragment() {
 
             btnAddTime.setOnClickListener {
                 val now = Calendar.getInstance()
-                val timePicker = TimePickerDialog(requireContext(),
+                TimePickerDialog(requireContext(),
                     { _, hour, minute ->
                         val timeStr = String.format("%02d:%02d", hour, minute)
                         val list = dayTimeMap.getOrPut(day) { mutableListOf() }
@@ -109,8 +98,7 @@ class CatalogFragment : Fragment() {
                     now.get(Calendar.HOUR_OF_DAY),
                     now.get(Calendar.MINUTE),
                     true
-                )
-                timePicker.show()
+                ).show()
             }
 
             daysContainer.addView(dayLayout)
@@ -122,6 +110,10 @@ class CatalogFragment : Fragment() {
             .setPositiveButton("Сохранить") { dialog, _ ->
                 val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
                 lifecycleScope.launch {
+                    val ownersList = spinnerUser.tag as List<Pair<String, Int>>
+                    val selectedPosition = spinnerUser.selectedItemPosition
+                    val selectedOwner = ownersList[selectedPosition]
+
                     for ((dayName, times) in dayTimeMap) {
                         val dayOfWeek = when(dayName) {
                             "Понедельник" -> 1
@@ -133,23 +125,22 @@ class CatalogFragment : Fragment() {
                             "Воскресенье" -> 7
                             else -> 1
                         }
-                        val selectedUser = spinnerUser.selectedItem.toString()
+
                         for (time in times) {
                             val reminder = Reminder(
                                 medicineName = selected.name,
-                                user = selectedUser,
                                 dayOfWeek = dayOfWeek,
-                                time = time
+                                time = time,
+                                ownerId = selectedOwner.second
                             )
                             val id = dao.insert(reminder).toInt()
-
                             ReminderScheduler.scheduleWeeklyReminder(
                                 context = requireContext(),
-                                id = id,
+                                reminderId = id,
                                 dayOfWeek = reminder.dayOfWeek,
                                 time = reminder.time,
                                 medicineName = reminder.medicineName,
-                                user = reminder.user
+                                ownerId = reminder.ownerId
                             )
                         }
                     }
@@ -170,7 +161,8 @@ class CatalogFragment : Fragment() {
 
         val today = Calendar.getInstance()
         var age = today.get(Calendar.YEAR) - year
-        if (today.get(Calendar.MONTH) + 1 < month || (today.get(Calendar.MONTH) + 1 == month && today.get(Calendar.DAY_OF_MONTH) < day)) age -= 1
+        if (today.get(Calendar.MONTH) + 1 < month ||
+            (today.get(Calendar.MONTH) + 1 == month && today.get(Calendar.DAY_OF_MONTH) < day)) age -= 1
         userAge = age
 
         val rv = view.findViewById<RecyclerView>(R.id.rvMedicines)
@@ -190,18 +182,5 @@ class CatalogFragment : Fragment() {
                 adapter.updateList(filtered)
             }
         })
-    }
-
-    private fun getAge(birthDate: String): Int {
-        val parts = birthDate.split("/").map { it.toInt() }
-        val day = parts[0]
-        val month = parts[1]
-        val year = parts[2]
-        val today = Calendar.getInstance()
-        var age = today.get(Calendar.YEAR) - year
-        if (today.get(Calendar.MONTH) + 1 < month ||
-            (today.get(Calendar.MONTH) + 1 == month && today.get(Calendar.DAY_OF_MONTH) < day)
-        ) age -= 1
-        return age
     }
 }

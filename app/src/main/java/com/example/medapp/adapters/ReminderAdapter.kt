@@ -8,7 +8,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.medapp.R
 import com.example.medapp.models.Reminder
 
-class ReminderAdapter(private var reminders: List<Reminder>) : RecyclerView.Adapter<ReminderAdapter.ReminderViewHolder>() {
+class ReminderAdapter(private var reminders: List<Pair<Reminder, String>>) :
+    RecyclerView.Adapter<ReminderAdapter.ReminderViewHolder>() {
 
     inner class ReminderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val tvMedicine: TextView = itemView.findViewById(R.id.tvMedicine)
@@ -22,18 +23,21 @@ class ReminderAdapter(private var reminders: List<Reminder>) : RecyclerView.Adap
     }
 
     override fun onBindViewHolder(holder: ReminderViewHolder, position: Int) {
-        val reminder = reminders[position]
+        val (reminder, ownerName) = reminders[position]
         holder.tvMedicine.text = reminder.medicineName
-        holder.tvUser.text = reminder.user
-        val dayNames = listOf("Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье")
+        holder.tvUser.text = ownerName
+
+        val dayNames = listOf(
+            "Понедельник", "Вторник", "Среда", "Четверг",
+            "Пятница", "Суббота", "Воскресенье"
+        )
         val dayText = dayNames[reminder.dayOfWeek - 1]
         holder.tvTime.text = "$dayText, Время: ${reminder.time}"
-
     }
 
     override fun getItemCount(): Int = reminders.size
 
-    fun updateList(newList: List<Reminder>) {
+    fun updateList(newList: List<Pair<Reminder, String>>) {
         reminders = newList
         notifyDataSetChanged()
     }

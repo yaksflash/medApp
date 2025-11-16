@@ -14,4 +14,12 @@ interface ChildDao {
 
     @Query("SELECT * FROM children ORDER BY name ASC")
     suspend fun getAll(): List<Child>
+
+    // Добавляем метод для получения ребёнка по id
+    @Query("SELECT * FROM children WHERE id = :childId LIMIT 1")
+    suspend fun getChildById(childId: Int): Child?
+
+    @Update
+    suspend fun update(child: Child)
+
 }

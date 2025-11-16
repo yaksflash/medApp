@@ -2,6 +2,7 @@ package com.example.medapp.fragments
 
 import android.app.AlertDialog
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,7 +16,11 @@ import com.example.medapp.R
 import com.example.medapp.adapters.ChildrenAdapter
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Child
+import com.example.medapp.models.Reminder
+import com.example.medapp.utils.ReminderScheduler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 class FamilyFragment : Fragment() {
@@ -42,7 +47,7 @@ class FamilyFragment : Fragment() {
             childrenList,
             onItemClick = { child -> showChildReminders(child) },
             onDeleteClick = { child -> confirmDeleteChild(child) },
-            onQRClick = { child -> showChildQR(child) } // QR
+            onQRClick = { child -> showChildQR(child) }
         )
 
         rvChildren.layoutManager = LinearLayoutManager(requireContext())
@@ -50,37 +55,33 @@ class FamilyFragment : Fragment() {
 
         loadChildren()
 
-        btnAddChild.setOnClickListener {
-            showAddChildDialog()
-        }
+        btnAddChild.setOnClickListener { showAddChildDialog() }
     }
 
     private fun loadChildren() {
         val dao = AppDatabase.getDatabase(requireContext()).childDao()
         lifecycleScope.launch {
+            val children = withContext(Dispatchers.IO) { dao.getAll() }
             childrenList.clear()
-            childrenList.addAll(dao.getAll())
+            childrenList.addAll(children)
             childrenAdapter.notifyDataSetChanged()
         }
     }
 
     private fun showAddChildDialog() {
-        val layout = LinearLayout(requireContext())
-        layout.orientation = LinearLayout.VERTICAL
+        val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
 
-        val nameInput = EditText(requireContext())
-        nameInput.hint = "Имя"
+        val nameInput = EditText(requireContext()).apply { hint = "Имя" }
         layout.addView(nameInput)
 
-        val dobButton = Button(requireContext())
-        dobButton.text = "Выберите дату рождения"
+        val dobButton = Button(requireContext()).apply { text = "Выберите дату рождения" }
         layout.addView(dobButton)
 
         var selectedDate: String? = null
 
         dobButton.setOnClickListener {
             val today = Calendar.getInstance()
-            val datePicker = DatePickerDialog(
+            DatePickerDialog(
                 requireContext(),
                 { _, year, month, dayOfMonth ->
                     selectedDate = String.format("%02d/%02d/%04d", dayOfMonth, month + 1, year)
@@ -89,8 +90,7 @@ class FamilyFragment : Fragment() {
                 today.get(Calendar.YEAR),
                 today.get(Calendar.MONTH),
                 today.get(Calendar.DAY_OF_MONTH)
-            )
-            datePicker.show()
+            ).show()
         }
 
         AlertDialog.Builder(requireContext())
@@ -101,7 +101,9 @@ class FamilyFragment : Fragment() {
                 if (name.isNotEmpty() && selectedDate != null) {
                     val child = Child(name = name, birthDate = selectedDate!!)
                     lifecycleScope.launch {
-                        AppDatabase.getDatabase(requireContext()).childDao().insert(child)
+                        withContext(Dispatchers.IO) {
+                            AppDatabase.getDatabase(requireContext()).childDao().insert(child)
+                        }
                         loadChildren()
                     }
                 }
@@ -118,8 +120,10 @@ class FamilyFragment : Fragment() {
             .setPositiveButton("Удалить") { dialog, _ ->
                 lifecycleScope.launch {
                     val db = AppDatabase.getDatabase(requireContext())
-                    db.reminderDao().deleteForUser(child.name)
-                    db.childDao().delete(child)
+                    withContext(Dispatchers.IO) {
+                        db.reminderDao().deleteForOwner(child.id)
+                        db.childDao().delete(child)
+                    }
                     loadChildren()
                 }
                 dialog.dismiss()
@@ -129,9 +133,9 @@ class FamilyFragment : Fragment() {
     }
 
     private fun showChildReminders(child: Child) {
-        val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
+        val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
         lifecycleScope.launch {
-            val reminders = dao.getAllForUser(child.name)
+            val reminders = withContext(Dispatchers.IO) { reminderDao.getAllForOwner(child.id) }
             val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
 
             val grouped = reminders.groupBy { it.dayOfWeek }
@@ -142,33 +146,25 @@ class FamilyFragment : Fragment() {
             days.forEachIndexed { index, day ->
                 val dayReminders = grouped[index + 1] ?: emptyList()
                 if (dayReminders.isNotEmpty()) {
-                    val dayText = TextView(requireContext())
-                    dayText.text = day
-                    dayText.textSize = 18f
+                    val dayText = TextView(requireContext()).apply {
+                        text = day
+                        textSize = 18f
+                    }
                     layout.addView(dayText)
 
                     dayReminders.forEach { reminder ->
-                        val reminderLayout = LinearLayout(requireContext())
-                        reminderLayout.orientation = LinearLayout.HORIZONTAL
-
-                        val tv = TextView(requireContext())
-                        tv.text = "${reminder.medicineName} - ${reminder.time}"
-                        tv.layoutParams =
-                            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-
-                        val btnDelete = Button(requireContext())
-                        btnDelete.text = "-"
-                        btnDelete.setOnClickListener {
-                            lifecycleScope.launch {
-                                dao.delete(reminder)
-                                layout.removeView(reminderLayout)
+                        val reminderTextView = TextView(requireContext()).apply {
+                            text = "${reminder.medicineName} - ${reminder.time}"
+                            setPadding(16, 8, 16, 8)
+                            setBackgroundResource(R.drawable.reminder_item_bg)
+                            setOnClickListener {
+                                // Диалог для редактирования/удаления напоминания
+                                showReminderEditDialog(reminder, this) // используем 'this' вместо 'tv'
                             }
                         }
-
-                        reminderLayout.addView(tv)
-                        reminderLayout.addView(btnDelete)
-                        layout.addView(reminderLayout)
+                        layout.addView(reminderTextView)
                     }
+
                 }
             }
 
@@ -178,6 +174,54 @@ class FamilyFragment : Fragment() {
                 .setPositiveButton("Закрыть", null)
                 .show()
         }
+    }
+
+    private fun showReminderEditDialog(reminder: Reminder, textView: TextView) {
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("${reminder.medicineName} - ${reminder.time}")
+        builder.setMessage("Выберите действие:")
+
+        builder.setNeutralButton("Изменить время") { _, _ ->
+            val parts = reminder.time.split(":").map { it.toIntOrNull() ?: 0 }
+            val hour = parts.getOrNull(0) ?: 0
+            val minute = parts.getOrNull(1) ?: 0
+
+            TimePickerDialog(requireContext(), { _, h, m ->
+                val newTime = String.format("%02d:%02d", h, m)
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        // Отменяем старое уведомление
+                        ReminderScheduler.cancelReminder(requireContext(), reminder.id)
+                        // Сохраняем новое время
+                        reminder.time = newTime
+                        AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
+                    }
+                    // Ставим новое уведомление
+                    ReminderScheduler.scheduleWeeklyReminder(
+                        context = requireContext(),
+                        reminderId = reminder.id,
+                        dayOfWeek = reminder.dayOfWeek,
+                        time = reminder.time,
+                        medicineName = reminder.medicineName,
+                        ownerId = reminder.ownerId
+                    )
+                    textView.text = "${reminder.medicineName} - ${reminder.time}"
+                }
+            }, hour, minute, true).show()
+        }
+
+        builder.setNegativeButton("Удалить") { _, _ ->
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) {
+                    AppDatabase.getDatabase(requireContext()).reminderDao().delete(reminder)
+                    ReminderScheduler.cancelReminder(requireContext(), reminder.id)
+                }
+                (textView.parent as? LinearLayout)?.removeView(textView)
+            }
+        }
+
+        builder.setPositiveButton("Отмена", null)
+        builder.show()
     }
 
     private fun getAge(birthDate: String): Int {
@@ -197,7 +241,7 @@ class FamilyFragment : Fragment() {
     private fun showChildQR(child: Child) {
         val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
         lifecycleScope.launch {
-            val reminders = reminderDao.getAllForUser(child.name)
+            val reminders = withContext(Dispatchers.IO) { reminderDao.getAllForOwner(child.id) }
             val jsonMap = mapOf(
                 "name" to child.name,
                 "birthDate" to child.birthDate,
@@ -210,7 +254,6 @@ class FamilyFragment : Fragment() {
                 }
             )
             val jsonString = com.google.gson.Gson().toJson(jsonMap)
-
             val qrBitmap = generateQR(jsonString)
             showQRDialog(qrBitmap)
         }
@@ -219,7 +262,7 @@ class FamilyFragment : Fragment() {
     private fun generateQR(data: String): android.graphics.Bitmap {
         val size = 512
         val hints = mapOf(
-            com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8", // важно
+            com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8",
             com.google.zxing.EncodeHintType.MARGIN to 1
         )
 
@@ -240,10 +283,8 @@ class FamilyFragment : Fragment() {
         return bmp
     }
 
-
     private fun showQRDialog(qr: android.graphics.Bitmap) {
-        val imageView = ImageView(requireContext())
-        imageView.setImageBitmap(qr)
+        val imageView = ImageView(requireContext()).apply { setImageBitmap(qr) }
         AlertDialog.Builder(requireContext())
             .setTitle("QR для синхронизации")
             .setView(imageView)

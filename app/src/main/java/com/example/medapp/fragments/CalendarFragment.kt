@@ -1,10 +1,11 @@
 package com.example.medapp.fragments
 
+import android.app.AlertDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
@@ -12,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.medapp.R
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Reminder
+import com.example.medapp.utils.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,68 +42,119 @@ class CalendarFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         calendarContainer = view.findViewById(R.id.calendarContainer)
         loadReminders()
     }
 
     private fun loadReminders() {
         val prefs = requireContext().getSharedPreferences("user_data", 0)
-        val currentUser = prefs.getString("user_name", "") ?: ""
+        val currentOwnerId = prefs.getInt("owner_id", -1)
 
         lifecycleScope.launch {
-            val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
-            val reminders: List<Reminder> = withContext(Dispatchers.IO) {
-                dao.getAllForUser(currentUser)
+            val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
+            val childDao = AppDatabase.getDatabase(requireContext()).childDao()
+
+            val reminders = withContext(Dispatchers.IO) {
+                reminderDao.getAllForOwner(currentOwnerId)
             }
-            displayReminders(reminders)
+
+            displayReminders(reminders, childDao)
         }
     }
 
-    private fun displayReminders(reminders: List<Reminder>) {
+    private fun displayReminders(
+        reminders: List<Reminder>,
+        childDao: com.example.medapp.data.ChildDao
+    ) {
         calendarContainer.removeAllViews()
-        val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
 
-        for ((dayNum, dayName) in daysOfWeek) {
-            val dayReminders = reminders.filter { it.dayOfWeek == dayNum }
-            if (dayReminders.isEmpty()) continue
+        lifecycleScope.launch {
+            for ((dayNum, dayName) in daysOfWeek) {
+                val dayReminders = reminders.filter { it.dayOfWeek == dayNum }
+                if (dayReminders.isEmpty()) continue
 
-            val dayTextView = TextView(requireContext()).apply {
-                text = dayName
-                textSize = 18f
-                setPadding(0, 16, 0, 8)
-            }
-            calendarContainer.addView(dayTextView)
-
-            for (r in dayReminders) {
-                val reminderLayout = LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.HORIZONTAL
+                val dayTextView = TextView(requireContext()).apply {
+                    text = dayName
+                    textSize = 18f
+                    setPadding(0, 16, 0, 8)
                 }
+                calendarContainer.addView(dayTextView)
 
-                val reminderText = TextView(requireContext()).apply {
-                    text = "${r.medicineName} - ${r.time}"
-                    layoutParams = LinearLayout.LayoutParams(
-                        0,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        1f
-                    )
-                    setPadding(16, 4, 0, 4)
-                }
+                for (reminder in dayReminders) {
+                    val ownerName = withContext(Dispatchers.IO) {
+                        if (reminder.ownerId == -1) "Родитель"
+                        else childDao.getChildById(reminder.ownerId)?.name ?: "Ребёнок"
+                    }
 
-                val btnDelete = Button(requireContext()).apply {
-                    text = "-"
-                    setOnClickListener {
-                        lifecycleScope.launch {
-                            dao.delete(r)
-                            calendarContainer.removeView(reminderLayout)
+                    val reminderText = TextView(requireContext()).apply {
+                        text = "${reminder.medicineName} - ${reminder.time}"
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
+                        setPadding(16, 8, 16, 8)
+                        setBackgroundResource(R.drawable.reminder_item_bg)
+                        setOnClickListener {
+                            showEditDialog(reminder, this)
                         }
                     }
-                }
 
-                reminderLayout.addView(reminderText)
-                reminderLayout.addView(btnDelete)
-                calendarContainer.addView(reminderLayout)
+                    calendarContainer.addView(reminderText)
+                }
             }
         }
+    }
+
+    private fun showEditDialog(reminder: Reminder, textView: TextView) {
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("${reminder.medicineName} - ${reminder.time}")
+        builder.setMessage("Выберите действие:")
+
+        builder.setNeutralButton("Изменить время") { _, _ ->
+            val parts = reminder.time.split(":").map { it.toIntOrNull() ?: 0 }
+            val hour = parts.getOrNull(0) ?: 0
+            val minute = parts.getOrNull(1) ?: 0
+
+            TimePickerDialog(requireContext(), { _, h, m ->
+                val newTime = String.format("%02d:%02d", h, m)
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        // Отменяем старое уведомление
+                        ReminderScheduler.cancelReminder(requireContext(), reminder.id)
+
+                        // Сохраняем новое время в базе
+                        reminder.time = newTime
+                        AppDatabase.getDatabase(requireContext()).reminderDao().update(reminder)
+                    }
+                    // Ставим новое уведомление
+                    ReminderScheduler.scheduleWeeklyReminder(
+                        context = requireContext(),
+                        reminderId = reminder.id,
+                        dayOfWeek = reminder.dayOfWeek,
+                        time = reminder.time,
+                        medicineName = reminder.medicineName,
+                        ownerId = reminder.ownerId
+                    )
+                    // Обновляем UI
+                    textView.text = "${reminder.medicineName} - ${reminder.time}"
+                }
+            }, hour, minute, true).show()
+        }
+
+        builder.setNegativeButton("Удалить") { _, _ ->
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) {
+                    // Удаляем напоминание из базы
+                    AppDatabase.getDatabase(requireContext()).reminderDao().delete(reminder)
+                }
+                // Отменяем уведомление
+                ReminderScheduler.cancelReminder(requireContext(), reminder.id)
+                // Обновляем UI
+                loadReminders()
+            }
+        }
+
+        builder.setPositiveButton("Отмена", null)
+        builder.show()
     }
 }

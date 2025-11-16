@@ -15,14 +15,16 @@ class BootReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 val dao = AppDatabase.getDatabase(context).reminderDao()
                 val reminders = dao.getAll()
-                reminders.forEach { r ->
+
+                reminders.forEach { reminder ->
+                    // передаём id владельца вместо user
                     ReminderScheduler.scheduleWeeklyReminder(
-                        context,
-                        r.id,
-                        r.dayOfWeek,
-                        r.time,
-                        r.medicineName,
-                        r.user
+                        context = context,
+                        reminderId = reminder.id,
+                        dayOfWeek = reminder.dayOfWeek,
+                        time = reminder.time,
+                        medicineName = reminder.medicineName,
+                        ownerId = reminder.ownerId   // <- новое поле
                     )
                 }
             }

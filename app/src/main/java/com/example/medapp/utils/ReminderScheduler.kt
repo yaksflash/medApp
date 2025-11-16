@@ -8,16 +8,17 @@ import android.os.Build
 import android.provider.Settings
 import com.example.medapp.receivers.ReminderReceiver
 import java.util.*
+import com.example.medapp.data.AppDatabase
 
 object ReminderScheduler {
 
     fun scheduleWeeklyReminder(
         context: Context,
-        id: Int,
+        reminderId: Int,
         dayOfWeek: Int,
         time: String,
         medicineName: String,
-        user: String
+        ownerId: Int
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -38,16 +39,16 @@ object ReminderScheduler {
         }
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
-            putExtra("reminderId", id)
+            putExtra("reminderId", reminderId)
             putExtra("medicineName", medicineName)
-            putExtra("user", user)
+            putExtra("ownerId", ownerId)
             putExtra("time", time)
             putExtra("dayOfWeek", dayOfWeek)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            id,
+            reminderId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -59,17 +60,18 @@ object ReminderScheduler {
         )
     }
 
-    fun cancelReminder(context: Context, id: Int) {
+    fun cancelReminder(context: Context, reminderId: Int) {
         val intent = Intent(context, ReminderReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            id,
+            reminderId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(pendingIntent)
     }
+
 
     private fun timeBeforeNow(calendar: Calendar) = calendar.timeInMillis < System.currentTimeMillis()
 
