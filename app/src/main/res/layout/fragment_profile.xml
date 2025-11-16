@@ -1,23 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/profile_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="@color/background_color">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Имя -->
+        <!-- Заголовок -->
+        <TextView
+            android:id="@+id/tvProfileTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Профиль"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary_text"
+            android:paddingBottom="24dp"/>
+
+        <!-- Карточка Имя -->
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="16dp"
             android:gravity="center_vertical"
-            android:paddingTop="16dp"
-            android:paddingBottom="16dp">
+            android:background="@drawable/card_bg"
+            android:elevation="4dp"
+            android:layout_marginBottom="16dp">
 
             <TextView
                 android:id="@+id/tvName"
@@ -25,24 +40,27 @@
                 android:layout_height="wrap_content"
                 android:textSize="18sp"
                 android:layout_weight="1"
+                android:textColor="@color/primary_text"
                 android:text="Имя"/>
 
             <ImageView
                 android:id="@+id/btnEditName"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:src="@drawable/pen"
-                android:contentDescription="Редактировать имя"/>
+                android:contentDescription="Редактировать имя"
+                app:tint="@color/accent_color"/>
         </LinearLayout>
 
-        <!-- Дата рождения -->
+        <!-- Карточка Дата рождения -->
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:padding="16dp"
             android:gravity="center_vertical"
-            android:paddingTop="16dp"
-            android:paddingBottom="16dp">
+            android:background="@drawable/card_bg"
+            android:elevation="4dp">
 
             <TextView
                 android:id="@+id/tvBirthdate"
@@ -50,14 +68,16 @@
                 android:layout_height="wrap_content"
                 android:textSize="18sp"
                 android:layout_weight="1"
+                android:textColor="@color/primary_text"
                 android:text="Дата рождения"/>
 
             <ImageView
                 android:id="@+id/btnEditBirthdate"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:src="@drawable/pen"
-                android:contentDescription="Редактировать дату рождения"/>
+                android:contentDescription="Редактировать дату рождения"
+                app:tint="@color/accent_color"/>
         </LinearLayout>
 
     </LinearLayout>

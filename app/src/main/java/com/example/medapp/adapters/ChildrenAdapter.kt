@@ -35,6 +35,9 @@ class ChildrenAdapter(
         holder.tvName.text = child.name
         holder.tvAge.text = "Возраст: ${getAge(child.birthDate)} лет"
 
+        holder.itemView.setBackgroundResource(R.drawable.child_card_bg)
+        holder.itemView.setPadding(16, 16, 16, 16)
+
         holder.itemView.setOnClickListener { onItemClick(child) }
         holder.btnDelete.setOnClickListener { onDeleteClick(child) }
         holder.btnQR.setOnClickListener { onQRClick(child) }

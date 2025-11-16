@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical" android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -7,11 +8,31 @@
         android:id="@+id/searchInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Поиск лекарства" />
+        android:hint="Поиск лекарства"
+        android:padding="12dp"
+        android:drawableLeft="@drawable/search_icon"
+        android:background="@android:drawable/edit_text"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/btnAddCustom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Добавить своё упоминание"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:padding="14dp"
+        android:layout_marginTop="12dp"
+        android:background="@android:color/holo_blue_light"
+        android:textColor="@android:color/white"
+        android:drawableRight="@android:drawable/ic_input_add"
+        android:drawablePadding="8dp"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvMedicines"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:paddingTop="12dp"/>
 </LinearLayout>

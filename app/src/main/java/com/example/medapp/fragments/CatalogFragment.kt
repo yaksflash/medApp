@@ -10,13 +10,14 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.medapp.R
 import com.example.medapp.adapters.MedicineAdapter
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Medicine
 import com.example.medapp.models.Reminder
+import com.example.medapp.models.Child
 import com.example.medapp.repositories.MedicineRepository
 import com.example.medapp.utils.ReminderScheduler
 import kotlinx.coroutines.launch
@@ -32,43 +33,73 @@ class CatalogFragment : Fragment() {
         return inflater.inflate(R.layout.fragment_catalog, container, false)
     }
 
-    private fun showMedicineDialog(selected: Medicine) {
-        val dialogView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_medicine_details, null)
+    private fun showMedicineDialog(selectedName: String?) {
+        val isCustom = selectedName == null
+        val dialogLayoutRes = if (isCustom) R.layout.dialog_medicine_custom else R.layout.dialog_medicine_details
+        val dialogView = LayoutInflater.from(requireContext()).inflate(dialogLayoutRes, null)
 
         val spinnerUser = dialogView.findViewById<Spinner>(R.id.spinnerUser)
         val daysContainer = dialogView.findViewById<LinearLayout>(R.id.daysContainer)
+        val tvInstruction = dialogView.findViewById<TextView>(R.id.tvInstruction)
+        val customNameField = if (isCustom) dialogView.findViewById<EditText>(R.id.etCustomName) else null
 
         val dayTimeMap = mutableMapOf<String, MutableList<String>>()
         val daysOfWeek = listOf("Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье")
 
         val childrenDao = AppDatabase.getDatabase(requireContext()).childDao()
-        val prefs = requireContext().getSharedPreferences("user_data", 0)
-        val currentOwnerId = prefs.getInt("owner_id", -1)
+        val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
 
         lifecycleScope.launch {
             val children = childrenDao.getAll()
-            val owners = mutableListOf<Pair<String, Int>>() // Pair<name, ownerId>
+            val owners = mutableListOf<Pair<String, Int>>()
             owners.add("Родитель" to -1)
             owners.addAll(children.map { it.name to it.id })
 
             val adapterSpinner = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, owners.map { it.first })
             adapterSpinner.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerUser.adapter = adapterSpinner
-
-            // Сохраняем список owners для использования при сохранении
             spinnerUser.tag = owners
+
+            spinnerUser.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val selectedOwner = owners[position]
+                    val age = if (selectedOwner.second == -1) {
+                        userAge
+                    } else {
+                        val child = children.find { it.id == selectedOwner.second }
+                        if (child != null) {
+                            val parts = child.birthDate.split("/").map { it.toInt() }
+                            var ageCalc = Calendar.getInstance().get(Calendar.YEAR) - parts[2]
+                            if (Calendar.getInstance().get(Calendar.MONTH) + 1 < parts[1] ||
+                                (Calendar.getInstance().get(Calendar.MONTH) + 1 == parts[1] &&
+                                        Calendar.getInstance().get(Calendar.DAY_OF_MONTH) < parts[0])) ageCalc -= 1
+                            ageCalc
+                        } else 0
+                    }
+
+                    // Получаем инструкцию лекарства по возрасту
+                    val medName = if (isCustom) customNameField?.text?.toString()?.trim() ?: "" else selectedName ?: ""
+                    val med = MedicineRepository.findMedicineByName(medicines, medName)
+                    tvInstruction.text = med?.let { MedicineRepository.getInstructionForAge(it, age) } ?: "Инструкция недоступна"
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {
+                    tvInstruction.text = "Инструкция появится здесь"
+                }
+            }
         }
 
-        // UI дни недели
+        // UI дни недели и добавление времени
         daysOfWeek.forEach { day ->
             val dayLayout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
             val dayLabelLayout = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL }
+
             val dayText = TextView(requireContext()).apply {
                 text = day
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val btnAddTime = Button(requireContext()).apply { text = "Добавить время" }
+
             dayLabelLayout.addView(dayText)
             dayLabelLayout.addView(btnAddTime)
             dayLayout.addView(dayLabelLayout)
@@ -105,14 +136,19 @@ class CatalogFragment : Fragment() {
         }
 
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle(selected.name)
+            .setTitle(if (isCustom) "Добавить своё упоминание" else (selectedName ?: "Напоминание"))
             .setView(dialogView)
             .setPositiveButton("Сохранить") { dialog, _ ->
-                val dao = AppDatabase.getDatabase(requireContext()).reminderDao()
                 lifecycleScope.launch {
-                    val ownersList = spinnerUser.tag as List<Pair<String, Int>>
-                    val selectedPosition = spinnerUser.selectedItemPosition
-                    val selectedOwner = ownersList[selectedPosition]
+                    val ownersList = spinnerUser.tag as? List<Pair<String, Int>> ?: return@launch
+                    val selectedOwner = ownersList.getOrNull(spinnerUser.selectedItemPosition) ?: ("Родитель" to -1)
+
+                    val medicineTitle = if (isCustom) {
+                        val txt = customNameField?.text?.toString()?.trim()
+                        if (txt.isNullOrEmpty()) "Без названия" else txt
+                    } else {
+                        selectedName ?: "Без названия"
+                    }
 
                     for ((dayName, times) in dayTimeMap) {
                         val dayOfWeek = when(dayName) {
@@ -128,12 +164,12 @@ class CatalogFragment : Fragment() {
 
                         for (time in times) {
                             val reminder = Reminder(
-                                medicineName = selected.name,
+                                medicineName = medicineTitle,
                                 dayOfWeek = dayOfWeek,
                                 time = time,
                                 ownerId = selectedOwner.second
                             )
-                            val id = dao.insert(reminder).toInt()
+                            val id = reminderDao.insert(reminder).toInt()
                             ReminderScheduler.scheduleWeeklyReminder(
                                 context = requireContext(),
                                 reminderId = id,
@@ -167,11 +203,14 @@ class CatalogFragment : Fragment() {
 
         val rv = view.findViewById<RecyclerView>(R.id.rvMedicines)
         val searchInput = view.findViewById<EditText>(R.id.searchInput)
+        val addCustom = view.findViewById<TextView>(R.id.btnAddCustom)
 
         medicines = MedicineRepository.loadMedicines(requireContext())
-        adapter = MedicineAdapter(medicines) { selected -> showMedicineDialog(selected) }
+        adapter = MedicineAdapter(medicines) { selected ->
+            showMedicineDialog(selected.name)
+        }
 
-        rv.layoutManager = LinearLayoutManager(requireContext())
+        rv.layoutManager = GridLayoutManager(requireContext(), 2)
         rv.adapter = adapter
 
         searchInput.addTextChangedListener(object : TextWatcher {
@@ -182,5 +221,9 @@ class CatalogFragment : Fragment() {
                 adapter.updateList(filtered)
             }
         })
+
+        addCustom.setOnClickListener {
+            showMedicineDialog(null)
+        }
     }
 }

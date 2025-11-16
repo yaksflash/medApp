@@ -3,19 +3,38 @@
     android:orientation="vertical"
     android:padding="16dp"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background_color">
 
-    <Button
-        android:id="@+id/btnAddChild"
+    <!-- Заголовок -->
+    <TextView
+        android:id="@+id/tvFamilyTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Добавить ребенка"/>
+        android:text="Семья"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_text"
+        android:paddingBottom="16dp"/>
 
+    <!-- Кнопка добавить ребёнка -->
+    <Button
+        android:id="@+id/btnAddChild"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Добавить ребенка"
+        android:backgroundTint="@color/accent_color"
+        android:textColor="@android:color/white"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"
+        />
+
+    <!-- Список детей -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvChildren"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingTop="16dp"/>
-
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"/>
 </LinearLayout>

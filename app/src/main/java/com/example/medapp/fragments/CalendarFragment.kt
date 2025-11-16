@@ -49,6 +49,7 @@ class CalendarFragment : Fragment() {
     private fun loadReminders() {
         val prefs = requireContext().getSharedPreferences("user_data", 0)
         val currentOwnerId = prefs.getInt("owner_id", -1)
+        val accountType = prefs.getString("account_type", "child")
 
         lifecycleScope.launch {
             val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
@@ -58,13 +59,14 @@ class CalendarFragment : Fragment() {
                 reminderDao.getAllForOwner(currentOwnerId)
             }
 
-            displayReminders(reminders, childDao)
+            displayReminders(reminders, childDao, accountType ?: "child")
         }
     }
 
     private fun displayReminders(
         reminders: List<Reminder>,
-        childDao: com.example.medapp.data.ChildDao
+        childDao: com.example.medapp.data.ChildDao,
+        accountType: String
     ) {
         calendarContainer.removeAllViews()
 
@@ -86,7 +88,7 @@ class CalendarFragment : Fragment() {
                         else childDao.getChildById(reminder.ownerId)?.name ?: "Ребёнок"
                     }
 
-                    val reminderText = TextView(requireContext()).apply {
+                    val reminderTextView = TextView(requireContext()).apply {
                         text = "${reminder.medicineName} - ${reminder.time}"
                         layoutParams = LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -94,12 +96,16 @@ class CalendarFragment : Fragment() {
                         )
                         setPadding(16, 8, 16, 8)
                         setBackgroundResource(R.drawable.reminder_item_bg)
-                        setOnClickListener {
-                            showEditDialog(reminder, this)
+                    }
+
+                    // Если аккаунт не child, включаем редактирование
+                    if (accountType != "child") {
+                        reminderTextView.setOnClickListener {
+                            showEditDialog(reminder, reminderTextView)
                         }
                     }
 
-                    calendarContainer.addView(reminderText)
+                    calendarContainer.addView(reminderTextView)
                 }
             }
         }
