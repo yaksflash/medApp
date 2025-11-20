@@ -55,4 +55,15 @@
 
     </ScrollView>
 
+    <!-- Кнопка помощи -->
+    <ImageView
+        android:id="@+id/btnHelp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_margin="16dp"
+        android:src="@drawable/question"
+        android:elevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

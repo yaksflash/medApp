@@ -4,6 +4,7 @@ import android.app.TimePickerDialog
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +18,6 @@ import com.example.medapp.adapters.MedicineAdapter
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Medicine
 import com.example.medapp.models.Reminder
-import com.example.medapp.models.Child
 import com.example.medapp.repositories.MedicineRepository
 import com.example.medapp.utils.ReminderScheduler
 import kotlinx.coroutines.launch
@@ -38,27 +38,22 @@ class CatalogFragment : Fragment() {
         val dialogLayoutRes = if (isCustom) R.layout.dialog_medicine_custom else R.layout.dialog_medicine_details
         val dialogView = LayoutInflater.from(requireContext()).inflate(dialogLayoutRes, null)
 
-        // --- Инициализация базовых полей ---
         val spinnerUser = dialogView.findViewById<Spinner>(R.id.spinnerUser)
-        // Этот контейнер будет содержать либо список дней (старый UI), либо список времени (новый UI)
         val daysContainer = dialogView.findViewById<LinearLayout>(R.id.daysContainer)
         val tvInstruction = dialogView.findViewById<TextView>(R.id.tvInstruction)
         val customNameField = if (isCustom) dialogView.findViewById<EditText>(R.id.etCustomName) else null
         val noteField = dialogView.findViewById<EditText>(R.id.etNote)
 
         // --- Создание переключателя режимов (Ежедневно / По дням) ---
-        // Вставляем его перед daysContainer.
-        // Примечание: Лучше добавить RadioGroup прямо в XML макеты dialog_medicine_...,
-        // но здесь мы добавим его программно для наглядности решения.
         val modeRadioGroup = RadioGroup(requireContext()).apply {
             orientation = RadioGroup.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, 0, 0, 16)
         }
         val rbDaily = RadioButton(requireContext()).apply {
             text = "Ежедневно"
             id = View.generateViewId()
-            isChecked = true // По умолчанию "Ежедневно"
+            isChecked = true 
         }
         val rbWeekly = RadioButton(requireContext()).apply {
             text = "По дням"
@@ -67,38 +62,71 @@ class CatalogFragment : Fragment() {
         modeRadioGroup.addView(rbDaily)
         modeRadioGroup.addView(rbWeekly)
 
-        // Добавляем переключатель в родительский контейнер (предполагается, что daysContainer находится в LinearLayout)
         (daysContainer.parent as ViewGroup).addView(modeRadioGroup, (daysContainer.parent as ViewGroup).indexOfChild(daysContainer))
 
-        // --- Структуры данных для хранения времени ---
-        val dayTimeMap = mutableMapOf<String, MutableList<String>>() // Для режима "По дням"
-        val dailyTimesList = mutableListOf<String>() // Для режима "Ежедневно"
+        // --- Структуры данных ---
+        val dayTimeMap = mutableMapOf<String, MutableList<String>>()
+        val dailyTimesList = mutableListOf<String>()
         val daysOfWeek = listOf("Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье")
 
-        // --- Функции отрисовки интерфейса ---
+        // --- Вспомогательная функция для создания чипса времени ---
+        fun createTimeChip(timeStr: String, onDelete: () -> Unit): View {
+            val chipLayout = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundResource(android.R.drawable.btn_default_small)
+                setPadding(16, 8, 16, 8)
+                
+                val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                params.setMargins(0, 0, 16, 0)
+                layoutParams = params
 
-        // UI для режима "Ежедневно"
+                setOnClickListener { onDelete() }
+            }
+
+            val tvTime = TextView(requireContext()).apply {
+                text = timeStr
+                textSize = 14f
+                setPadding(0, 0, 8, 0) // Отступ от текста до иконки
+            }
+
+            val iconClose = ImageView(requireContext()).apply {
+                setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+                // Делаем иконку немного прозрачной или серой, если нужно, но стандартная обычно ок
+                layoutParams = LinearLayout.LayoutParams(40, 40) // Небольшой размер
+            }
+
+            chipLayout.addView(tvTime)
+            chipLayout.addView(iconClose)
+            return chipLayout
+        }
+
+        // --- Функции отрисовки UI ---
+
         fun setupDailyUI() {
             daysContainer.removeAllViews()
 
             val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
             val btnAddDailyTime = Button(requireContext()).apply { text = "Добавить время приема" }
-            val timesContainer = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL } // Контейнер для плашек времени
+            val timesContainer = LinearLayout(requireContext()).apply { 
+                orientation = LinearLayout.HORIZONTAL 
+                // Разрешаем перенос строк если их много? LinearLayout не умеет wrap_content multiline, 
+                // но пока оставим так, для простоты горизонтальный скролл можно добавить потом если нужно
+            } 
+            // Чтобы список времен можно было скроллить горизонтально, обернем его
+            val scrollContainer = HorizontalScrollView(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+            scrollContainer.addView(timesContainer)
 
-            // Функция перерисовки плашек времени
             fun refreshDailyTimes() {
                 timesContainer.removeAllViews()
                 dailyTimesList.forEach { timeStr ->
-                    val timeView = TextView(requireContext()).apply {
-                        text = timeStr
-                        setPadding(16, 8, 16, 8)
-                        setBackgroundResource(android.R.drawable.btn_default_small)
-                        setOnClickListener {
-                            dailyTimesList.remove(timeStr)
-                            refreshDailyTimes()
-                        }
+                    val chip = createTimeChip(timeStr) {
+                        dailyTimesList.remove(timeStr)
+                        refreshDailyTimes()
                     }
-                    timesContainer.addView(timeView)
+                    timesContainer.addView(chip)
                 }
             }
 
@@ -117,12 +145,11 @@ class CatalogFragment : Fragment() {
             }
 
             layout.addView(btnAddDailyTime)
-            layout.addView(timesContainer)
+            layout.addView(scrollContainer)
             daysContainer.addView(layout)
-            refreshDailyTimes() // Показать уже добавленные, если переключались туда-сюда
+            refreshDailyTimes()
         }
 
-        // UI для режима "По дням недели" (Ваш старый код)
         fun setupWeeklyUI() {
             daysContainer.removeAllViews()
             daysOfWeek.forEach { day ->
@@ -132,28 +159,27 @@ class CatalogFragment : Fragment() {
                     text = day
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
-                val btnAddTime = Button(requireContext()).apply { text = "Добавить время" }
+                val btnAddTime = Button(requireContext()).apply { text = "+" } // Компактная кнопка
+                
                 val timesContainer = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL }
+                val scrollContainer = HorizontalScrollView(requireContext()).apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                }
+                scrollContainer.addView(timesContainer)
 
                 dayLabelLayout.addView(dayText)
                 dayLabelLayout.addView(btnAddTime)
                 dayLayout.addView(dayLabelLayout)
-                dayLayout.addView(timesContainer)
+                dayLayout.addView(scrollContainer)
 
-                // Функция перерисовки времени для конкретного дня
                 fun refreshDayTimes(d: String, container: LinearLayout) {
                     container.removeAllViews()
                     dayTimeMap[d]?.forEach { tStr ->
-                        val timeView = TextView(requireContext()).apply {
-                            text = tStr
-                            setPadding(16, 8, 16, 8)
-                            setBackgroundResource(android.R.drawable.btn_default_small)
-                            setOnClickListener {
-                                dayTimeMap[d]?.remove(tStr)
-                                refreshDayTimes(d, container)
-                            }
+                        val chip = createTimeChip(tStr) {
+                            dayTimeMap[d]?.remove(tStr)
+                            refreshDayTimes(d, container)
                         }
-                        container.addView(timeView)
+                        container.addView(chip)
                     }
                 }
 
@@ -170,26 +196,18 @@ class CatalogFragment : Fragment() {
                     ).show()
                 }
 
-                // Восстанавливаем состояние при переключении
                 refreshDayTimes(day, timesContainer)
                 daysContainer.addView(dayLayout)
             }
         }
 
-        // Обработчик переключения режимов
         modeRadioGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (checkedId == rbDaily.id) {
-                setupDailyUI()
-            } else {
-                setupWeeklyUI()
-            }
+            if (checkedId == rbDaily.id) setupDailyUI() else setupWeeklyUI()
         }
 
-        // Инициализация UI по умолчанию
-        setupDailyUI()
+        setupDailyUI() // Default
 
-
-        // --- Логика Spinner'а пользователей (оставлена без изменений) ---
+        // --- Spinner ---
         val childrenDao = AppDatabase.getDatabase(requireContext()).childDao()
         val reminderDao = AppDatabase.getDatabase(requireContext()).reminderDao()
 
@@ -228,36 +246,32 @@ class CatalogFragment : Fragment() {
             }
         }
 
-        // --- Диалог сохранения ---
-        // --- Диалог сохранения ---
+        // --- Диалог ---
         val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle(if (isCustom) "Добавить своё напоминание" else (selectedName ?: "Напоминание"))
             .setView(dialogView)
-            .setPositiveButton("Сохранить", null) // Ставим null, чтобы не закрывалось сразу
+            .setPositiveButton("Сохранить", null)
             .setNegativeButton("Отмена", null)
             .create()
 
         dialog.show()
 
-        // Переопределяем поведение кнопки "Сохранить"
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             lifecycleScope.launch {
                 val ownersList = spinnerUser.tag as? List<Pair<String, Int>> ?: return@launch
                 val selectedOwner = ownersList.getOrNull(spinnerUser.selectedItemPosition) ?: ("Родитель" to -1)
 
-                // Валидация названия
                 val medicineTitle = if (isCustom) {
                     val txt = customNameField?.text?.toString()?.trim()
                     if (txt.isNullOrEmpty()) {
                         Toast.makeText(requireContext(), "Пожалуйста, введите название лекарства", Toast.LENGTH_SHORT).show()
-                        return@launch // Прерываем сохранение, диалог остается открытым
+                        return@launch
                     }
                     txt
                 } else {
                     selectedName ?: "Без названия"
                 }
 
-                // Валидация времени (проверяем, выбрано ли хоть одно время)
                 var hasTime = false
                 if (rbDaily.isChecked) {
                     if (dailyTimesList.isNotEmpty()) hasTime = true
@@ -267,20 +281,17 @@ class CatalogFragment : Fragment() {
 
                 if (!hasTime) {
                     Toast.makeText(requireContext(), "Пожалуйста, добавьте хотя бы одно время приема", Toast.LENGTH_SHORT).show()
-                    return@launch // Прерываем сохранение
+                    return@launch
                 }
 
-                // Если всё ок - сохраняем
                 val noteText = noteField?.text?.toString()?.trim()
 
-                // === Логика сохранения в зависимости от выбранного режима ===
                 if (rbDaily.isChecked) {
-                    // Режим "Ежедневно": Создаем напоминания для каждого из 7 дней
                     for (dayIndex in 1..7) {
                         for (time in dailyTimesList) {
                             val reminder = Reminder(
                                 medicineName = medicineTitle,
-                                dayOfWeek = dayIndex, // 1..7
+                                dayOfWeek = dayIndex,
                                 time = time,
                                 ownerId = selectedOwner.second,
                                 note = if (noteText.isNullOrEmpty()) null else noteText
@@ -298,7 +309,6 @@ class CatalogFragment : Fragment() {
                         }
                     }
                 } else {
-                    // Режим "По дням": Старая логика
                     for ((dayName, times) in dayTimeMap) {
                         val dayOfWeek = when(dayName) {
                             "Понедельник" -> 1
@@ -310,7 +320,6 @@ class CatalogFragment : Fragment() {
                             "Воскресенье" -> 7
                             else -> 1
                         }
-
                         for (time in times) {
                             val reminder = Reminder(
                                 medicineName = medicineTitle,
@@ -332,7 +341,6 @@ class CatalogFragment : Fragment() {
                         }
                     }
                 }
-                // Всё успешно сохранено, теперь можно закрыть диалог
                 dialog.dismiss()
             }
         }

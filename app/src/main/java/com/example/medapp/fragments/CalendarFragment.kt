@@ -3,9 +3,12 @@ package com.example.medapp.fragments
 import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
@@ -19,7 +22,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
-import android.widget.EditText
 
 class CalendarFragment : Fragment() {
 
@@ -81,20 +83,50 @@ class CalendarFragment : Fragment() {
                 val dayTextView = TextView(requireContext()).apply {
                     text = dayName
                     textSize = 18f
+                    // Делаем текст жирным
+                    setTypeface(null, android.graphics.Typeface.BOLD)
                     setPadding(0, 16, 0, 8)
                 }
                 calendarContainer.addView(dayTextView)
 
                 for (reminder in dayReminders) {
-                    val tv = TextView(requireContext()).apply {
-                        text = "${reminder.medicineName} - ${reminder.time}"
-                        setPadding(16, 8, 16, 8)
+                    // Контейнер для строки напоминания
+                    val itemLayout = LinearLayout(requireContext()).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
                         setBackgroundResource(R.drawable.reminder_item_bg)
-                        isClickable = true
-                        isFocusable = true
+                        // Увеличили внутренние отступы, чтобы плашка была больше
+                        setPadding(32, 24, 32, 24)
+                        
+                        val params = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
+                        // Увеличили отступы между плашками
+                        params.setMargins(0, 16, 0, 16)
+                        layoutParams = params
                     }
 
-                    tv.setOnClickListener {
+                    // Текст напоминания
+                    val tv = TextView(requireContext()).apply {
+                        text = "${reminder.medicineName} - ${reminder.time}"
+                        // Увеличили шрифт
+                        textSize = 20f
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    }
+
+                    // Иконка редактирования
+                    val editIcon = ImageView(requireContext()).apply {
+                        setImageResource(R.drawable.pen)
+                        layoutParams = LinearLayout.LayoutParams(80, 80)
+                        setColorFilter(android.graphics.Color.DKGRAY)
+                    }
+
+                    itemLayout.addView(tv)
+                    itemLayout.addView(editIcon)
+
+                    // Обработчик нажатия
+                    val clickListener = View.OnClickListener {
                         lifecycleScope.launch(Dispatchers.IO) {
                             val prefs = requireContext().getSharedPreferences("user_data", 0)
                             val birthdate = if (reminder.ownerId == currentUserId) {
@@ -104,13 +136,15 @@ class CalendarFragment : Fragment() {
                             }
 
                             val age = birthdate?.let {
-                                val parts = it.split("/").map { it.toInt() }
-                                val today = Calendar.getInstance()
-                                var a = today.get(Calendar.YEAR) - parts[2]
-                                if (today.get(Calendar.MONTH) + 1 < parts[1] ||
-                                    (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
-                                ) a -= 1
-                                a
+                                try {
+                                    val parts = it.split("/").map { s -> s.toInt() }
+                                    val today = Calendar.getInstance()
+                                    var a = today.get(Calendar.YEAR) - parts[2]
+                                    if (today.get(Calendar.MONTH) + 1 < parts[1] ||
+                                        (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
+                                    ) a -= 1
+                                    a
+                                } catch (e: Exception) { 0 }
                             } ?: 0
 
                             val medicine = MedicineRepository.findMedicineByName(medicines, reminder.medicineName)
@@ -137,7 +171,11 @@ class CalendarFragment : Fragment() {
                         }
                     }
 
-                    calendarContainer.addView(tv)
+                    itemLayout.setOnClickListener(clickListener)
+                    editIcon.setOnClickListener(clickListener) // Нажатие на иконку делает то же самое
+                    tv.setOnClickListener(clickListener)
+
+                    calendarContainer.addView(itemLayout)
                 }
             }
         }
@@ -147,7 +185,10 @@ class CalendarFragment : Fragment() {
         val builder = AlertDialog.Builder(requireContext())
         builder.setTitle("${reminder.medicineName} - ${reminder.time}")
 
-        val layout = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 20, 50, 20)
+        }
         val noteInput = EditText(requireContext()).apply {
             hint = "Заметка"
             setText(reminder.note)
@@ -197,11 +238,11 @@ class CalendarFragment : Fragment() {
                     AppDatabase.getDatabase(requireContext()).reminderDao().delete(reminder)
                 }
                 ReminderScheduler.cancelReminder(requireContext(), reminder.id)
-                loadReminders()
+                loadReminders() // Перезагружаем список после удаления
             }
         }
 
-        builder.setOnCancelListener { } // Можно оставить для отмены
+        builder.setOnCancelListener { }
 
         builder.show()
     }

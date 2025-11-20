@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
@@ -26,20 +27,37 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     private lateinit var btnScanQR: Button
     private lateinit var container: LinearLayout
+    private lateinit var btnHelp: ImageView
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         btnScanQR = view.findViewById(R.id.btnScanQR)
         container = view.findViewById(R.id.containerTodayReminders)
+        btnHelp = view.findViewById(R.id.btnHelp)
 
         val prefs = requireContext().getSharedPreferences("user_data", 0)
         val accountType = prefs.getString("account_type", "child")
 
         btnScanQR.visibility = if (accountType == "child") View.VISIBLE else View.GONE
         btnScanQR.setOnClickListener { startQRScanner() }
+        
+        // Обработчик нажатия на кнопку помощи
+        btnHelp.setOnClickListener {
+            showHelpDialog()
+        }
 
         loadTodayReminders()
+    }
+    
+    private fun showHelpDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Помощь")
+            .setMessage("На этом экране отображаются напоминания о приеме лекарств на сегодня.\n\n" +
+                        "Если вы Ребенок: нажмите 'QR-синхронизация', чтобы обновить расписание от родителя.\n\n" +
+                        "Нажмите на напоминание, чтобы увидеть инструкцию и заметку.")
+            .setPositiveButton("Закрыть", null)
+            .show()
     }
 
     private fun startQRScanner() {
