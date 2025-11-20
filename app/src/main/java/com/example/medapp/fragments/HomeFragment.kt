@@ -2,13 +2,19 @@ package com.example.medapp.fragments
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.medapp.R
 import com.example.medapp.data.AppDatabase
 import com.example.medapp.models.Reminder
@@ -29,6 +35,37 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private lateinit var container: LinearLayout
     private lateinit var btnHelp: ImageView
 
+    // --- Чат-бот классы ---
+    data class ChatMessage(val text: String, val isBot: Boolean)
+
+    class ChatAdapter(private val messages: MutableList<ChatMessage>) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
+        class ChatViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val tvBot: TextView = view.findViewById(R.id.tvBotMessage)
+            val tvUser: TextView = view.findViewById(R.id.tvUserMessage)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_message, parent, false)
+            return ChatViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
+            val msg = messages[position]
+            if (msg.isBot) {
+                holder.tvBot.text = msg.text
+                holder.tvBot.visibility = View.VISIBLE
+                holder.tvUser.visibility = View.GONE
+            } else {
+                holder.tvUser.text = msg.text
+                holder.tvUser.visibility = View.VISIBLE
+                holder.tvBot.visibility = View.GONE
+            }
+        }
+
+        override fun getItemCount() = messages.size
+    }
+    // ----------------------
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -42,22 +79,107 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         btnScanQR.visibility = if (accountType == "child") View.VISIBLE else View.GONE
         btnScanQR.setOnClickListener { startQRScanner() }
         
-        // Обработчик нажатия на кнопку помощи
         btnHelp.setOnClickListener {
-            showHelpDialog()
+            showHelpChatDialog()
         }
 
         loadTodayReminders()
     }
     
-    private fun showHelpDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Помощь")
-            .setMessage("На этом экране отображаются напоминания о приеме лекарств на сегодня.\n\n" +
-                        "Если вы Ребенок: нажмите 'QR-синхронизация', чтобы обновить расписание от родителя.\n\n" +
-                        "Нажмите на напоминание, чтобы увидеть инструкцию и заметку.")
+    private fun showHelpChatDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_chat_help, null)
+        val rvChat = dialogView.findViewById<RecyclerView>(R.id.rvChatMessages)
+        val etMessage = dialogView.findViewById<EditText>(R.id.etChatMessage)
+        val btnSend = dialogView.findViewById<Button>(R.id.btnSendMessage)
+
+        val messages = mutableListOf<ChatMessage>()
+        messages.add(ChatMessage("Привет! Я твой виртуальный помощник. Спроси меня о чем-нибудь про MedApp!", true))
+
+        val adapter = ChatAdapter(messages)
+        rvChat.layoutManager = LinearLayoutManager(requireContext())
+        rvChat.adapter = adapter
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Помощь (Чат)")
+            .setView(dialogView)
             .setPositiveButton("Закрыть", null)
-            .show()
+            .create()
+
+        btnSend.setOnClickListener {
+            val text = etMessage.text.toString().trim()
+            if (text.isNotEmpty()) {
+                // 1. Добавляем сообщение пользователя
+                messages.add(ChatMessage(text, false))
+                adapter.notifyItemInserted(messages.size - 1)
+                rvChat.scrollToPosition(messages.size - 1)
+                etMessage.setText("")
+
+                // 2. Генерируем ответ бота
+                val botResponse = getBotResponse(text)
+                
+                // 3. Добавляем ответ бота
+                messages.add(ChatMessage(botResponse, true))
+                adapter.notifyItemInserted(messages.size - 1)
+                rvChat.scrollToPosition(messages.size - 1)
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun getBotResponse(query: String): String {
+        val q = query.lowercase(Locale.getDefault())
+        
+        return when {
+            // 1. Удаление и редактирование
+            q.contains("удалить") || q.contains("убрать") || q.contains("редактировать") || q.contains("изменить") -> 
+                "Удалять и редактировать напоминания нужно в разделе 'Календарь'.\n\n" +
+                "1. Перейдите в 'Календарь'.\n" +
+                "2. Найдите нужное напоминание.\n" +
+                "3. Нажмите на него (или на иконку карандаша).\n" +
+                "4. В меню выберите 'Удалить' или измените заметку/время."
+
+            // 2. Создание напоминаний
+            (q.contains("создать") || q.contains("добавить")) && (q.contains("напоминани") || q.contains("лекарство")) ->
+                "Новые напоминания создаются в разделе 'Каталог'.\n\n" +
+                "1. Зайдите в 'Каталог'.\n" +
+                "2. Выберите лекарство из списка или нажмите 'Добавить свое'.\n" +
+                "3. В диалоге выберите, кому назначить (себе или ребенку) и укажите время (ежедневно или по дням недели)."
+
+            // 3. Семья и дети
+            q.contains("семья") || q.contains("ребенок") || q.contains("дети") || q.contains("добавить ребенка") ->
+                "Управлять профилями детей можно в разделе 'Семья'.\n\n" +
+                "Там вы можете добавить нового ребенка, чтобы потом назначать ему лекарства и генерировать QR-код для его телефона."
+
+            // 4. QR код и синхронизация
+            q.contains("qr") || q.contains("код") || q.contains("синхрон") ->
+                "QR-код нужен, чтобы передать расписание с телефона родителя на телефон ребенка.\n\n" +
+                "Как это сделать:\n" +
+                "1. Родитель заходит в 'Семья' -> нажимает 'Поделиться/QR' у ребенка.\n" +
+                "2. Ребенок на своем телефоне на главном экране нажимает 'QR-синхронизация' и сканирует код."
+
+            // 5. Каталог
+            q.contains("каталог") ->
+                "В 'Каталоге' находится список лекарств с инструкциями. Оттуда удобнее всего назначать прием лекарств."
+
+            // 6. Календарь
+            q.contains("календарь") || q.contains("расписани") ->
+                "В 'Календаре' отображается полный график приема на всю неделю. Дни недели там выделены жирным, а напоминания можно редактировать."
+
+            // 7. Приветствие
+            q.contains("привет") || q.contains("здравствуй") ->
+                "Привет! Я готов помочь. Спросите меня: 'Как удалить напоминание?', 'Как добавить ребенка?' или 'Зачем нужен QR?'."
+
+            // 8. Кто ты
+            q.contains("кто ты") || q.contains("бот") ->
+                "Я — умный помощник MedApp. Я знаю всё о функциях этого приложения."
+
+            // Дефолтный ответ
+            else -> "Я не уверен, что понял вопрос. Попробуйте спросить конкретнее:\n" +
+                    "- Как добавить напоминание?\n" +
+                    "- Как удалить лекарство?\n" +
+                    "- Как работает QR код?"
+        }
     }
 
     private fun startQRScanner() {
@@ -98,14 +220,11 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val db = AppDatabase.getDatabase(requireContext())
                 val reminderDao = db.reminderDao()
 
-                // Отменяем старые уведомления
                 val oldReminders = reminderDao.getAllForOwner(currentChildId)
                 oldReminders.forEach { ReminderScheduler.cancelReminder(requireContext(), it.id) }
 
-                // Удаляем старые напоминания
                 reminderDao.deleteForOwner(currentChildId)
 
-                // Сохраняем новые из QR
                 remindersList.forEach { r: QRReminder ->
                     val reminder = Reminder(
                         ownerId = currentChildId,
@@ -166,7 +285,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val reminders = reminderDao.getAllForOwner(currentUserId)
                     .filter { it.dayOfWeek == adjustedDay }
 
-                // Добавляем, только если список не пуст
                 if (reminders.isNotEmpty()) {
                     itemsToShow.add("Ваши напоминания" to reminders)
                 }
@@ -175,7 +293,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 val parentReminders = reminderDao.getAllForOwner(-1)
                     .filter { it.dayOfWeek == adjustedDay }
 
-                // Добавляем, только если список не пуст
                 if (parentReminders.isNotEmpty()) {
                     itemsToShow.add("Ваши лекарства" to parentReminders)
                 }
@@ -185,18 +302,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     val childRem = reminderDao.getAllForOwner(child.id)
                         .filter { it.dayOfWeek == adjustedDay }
 
-                    // Добавляем, только если список не пуст
                     if (childRem.isNotEmpty()) {
                         itemsToShow.add("Для ${child.name}" to childRem)
                     }
                 }
             }
 
-            // Загружаем лекарства для инструкций
             val medicines = MedicineRepository.loadMedicines(requireContext())
 
             withContext(Dispatchers.Main) {
-                // Если список секций пуст — показываем заглушку "Нет напоминаний"
                 if (itemsToShow.isEmpty()) {
                     val noRemindersView = TextView(requireContext()).apply {
                         text = "Напоминаний на сегодня нет"
@@ -206,25 +320,22 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                     }
                     container.addView(noRemindersView)
                 } else {
-                    // Иначе рисуем секции как обычно
                     itemsToShow.forEach { (title, reminders) ->
                         val titleView = TextView(requireContext()).apply {
                             text = title
                             textSize = 18f
-                            // Делаем шрифт жирным для наглядности заголовка
                             setTypeface(null, android.graphics.Typeface.BOLD)
                             setPadding(0, 24, 0, 8)
                         }
                         container.addView(titleView)
 
                         reminders.forEach { reminder ->
-                            val tv = TextView(requireContext()).apply {
-                                text = "${reminder.medicineName} - ${reminder.time}"
-                                setPadding(16, 12, 16, 12)
+                            val itemLayout = LinearLayout(requireContext()).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = Gravity.CENTER_VERTICAL
                                 setBackgroundResource(R.drawable.reminder_item_bg)
-                                isClickable = true
-                                isFocusable = true
-                                // Добавим отступ между элементами списка
+                                setPadding(16, 12, 16, 12)
+                                
                                 val params = LinearLayout.LayoutParams(
                                     LinearLayout.LayoutParams.MATCH_PARENT,
                                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -233,9 +344,24 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                                 layoutParams = params
                             }
 
-                            tv.setOnClickListener {
+                            val tv = TextView(requireContext()).apply {
+                                text = "${reminder.medicineName} - ${reminder.time}"
+                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                                textSize = 16f
+                            }
+
+                            val editBtn = ImageView(requireContext()).apply {
+                                setImageResource(R.drawable.pen)
+                                layoutParams = LinearLayout.LayoutParams(60, 60)
+                                setPadding(8, 8, 8, 8)
+                                setColorFilter(android.graphics.Color.DKGRAY)
+                            }
+
+                            itemLayout.addView(tv)
+                            itemLayout.addView(editBtn)
+
+                            val clickListener = View.OnClickListener {
                                 lifecycleScope.launch(Dispatchers.IO) {
-                                    // Логика определения возраста и поиска инструкции
                                     val birthdate = if (reminder.ownerId == currentUserId) {
                                         prefs.getString("user_birthdate", null)
                                     } else {
@@ -272,7 +398,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                                     }
                                 }
                             }
-                            container.addView(tv)
+                            itemLayout.setOnClickListener(clickListener)
+                            editBtn.setOnClickListener(clickListener)
+                            container.addView(itemLayout)
                         }
                     }
                 }
