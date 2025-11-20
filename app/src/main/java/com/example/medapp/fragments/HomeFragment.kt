@@ -147,18 +147,30 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             if (accountType == "child") {
                 val reminders = reminderDao.getAllForOwner(currentUserId)
                     .filter { it.dayOfWeek == adjustedDay }
-                itemsToShow.add("Ваши напоминания" to reminders)
+
+                // Добавляем, только если список не пуст
+                if (reminders.isNotEmpty()) {
+                    itemsToShow.add("Ваши напоминания" to reminders)
+                }
 
             } else { // parent
                 val parentReminders = reminderDao.getAllForOwner(-1)
                     .filter { it.dayOfWeek == adjustedDay }
-                itemsToShow.add("Ваши лекарства" to parentReminders)
+
+                // Добавляем, только если список не пуст
+                if (parentReminders.isNotEmpty()) {
+                    itemsToShow.add("Ваши лекарства" to parentReminders)
+                }
 
                 val children = childDao.getAll()
                 for (child in children) {
                     val childRem = reminderDao.getAllForOwner(child.id)
                         .filter { it.dayOfWeek == adjustedDay }
-                    itemsToShow.add("Для ${child.name}" to childRem)
+
+                    // Добавляем, только если список не пуст
+                    if (childRem.isNotEmpty()) {
+                        itemsToShow.add("Для ${child.name}" to childRem)
+                    }
                 }
             }
 
@@ -166,65 +178,88 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             val medicines = MedicineRepository.loadMedicines(requireContext())
 
             withContext(Dispatchers.Main) {
-                itemsToShow.forEach { (title, reminders) ->
-                    val titleView = TextView(requireContext()).apply {
-                        text = title
-                        textSize = 18f
-                        setPadding(0, 16, 0, 8)
+                // Если список секций пуст — показываем заглушку "Нет напоминаний"
+                if (itemsToShow.isEmpty()) {
+                    val noRemindersView = TextView(requireContext()).apply {
+                        text = "Напоминаний на сегодня нет"
+                        textSize = 16f
+                        textAlignment = View.TEXT_ALIGNMENT_CENTER
+                        setPadding(0, 32, 0, 32)
                     }
-                    container.addView(titleView)
-
-                    reminders.forEach { reminder ->
-                        val tv = TextView(requireContext()).apply {
-                            text = "${reminder.medicineName} - ${reminder.time}"
-                            setPadding(16, 8, 16, 8)
-                            setBackgroundResource(R.drawable.reminder_item_bg)
-                            isClickable = true
-                            isFocusable = true
+                    container.addView(noRemindersView)
+                } else {
+                    // Иначе рисуем секции как обычно
+                    itemsToShow.forEach { (title, reminders) ->
+                        val titleView = TextView(requireContext()).apply {
+                            text = title
+                            textSize = 18f
+                            // Делаем шрифт жирным для наглядности заголовка
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                            setPadding(0, 24, 0, 8)
                         }
+                        container.addView(titleView)
 
-                        tv.setOnClickListener {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                // Определяем возраст пользователя, которому принадлежит напоминание
-                                val birthdate = if (reminder.ownerId == currentUserId) {
-                                    prefs.getString("user_birthdate", null)
-                                } else {
-                                    childDao.getChildById(reminder.ownerId)?.birthDate
-                                }
+                        reminders.forEach { reminder ->
+                            val tv = TextView(requireContext()).apply {
+                                text = "${reminder.medicineName} - ${reminder.time}"
+                                setPadding(16, 12, 16, 12)
+                                setBackgroundResource(R.drawable.reminder_item_bg)
+                                isClickable = true
+                                isFocusable = true
+                                // Добавим отступ между элементами списка
+                                val params = LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                                )
+                                params.setMargins(0, 0, 0, 8)
+                                layoutParams = params
+                            }
 
-                                val age = birthdate?.let { birth ->
-                                    val parts = birth.split("/").map { it.toInt() }
-                                    val today = Calendar.getInstance()
-                                    var a = today.get(Calendar.YEAR) - parts[2]
-                                    if (today.get(Calendar.MONTH) + 1 < parts[1] ||
-                                        (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
-                                    ) a -= 1
-                                    a
-                                } ?: 0
-
-                                val medicine = MedicineRepository.findMedicineByName(medicines, reminder.medicineName)
-                                val instructionText = medicine?.let { MedicineRepository.getInstructionForAge(it, age) }.orEmpty()
-                                val noteText = reminder.note?.takeIf { it.isNotBlank() } ?: "Нет заметки"
-
-                                withContext(Dispatchers.Main) {
-                                    val message = buildString {
-                                        if (instructionText.isNotEmpty()) append("Инструкция: $instructionText\n\n")
-                                        append("Заметка: $noteText")
+                            tv.setOnClickListener {
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    // Логика определения возраста и поиска инструкции
+                                    val birthdate = if (reminder.ownerId == currentUserId) {
+                                        prefs.getString("user_birthdate", null)
+                                    } else {
+                                        childDao.getChildById(reminder.ownerId)?.birthDate
                                     }
 
-                                    AlertDialog.Builder(requireContext())
-                                        .setTitle("${reminder.medicineName} - ${reminder.time}")
-                                        .setMessage(message)
-                                        .setPositiveButton("ОК", null)
-                                        .show()
+                                    val age = birthdate?.let { birth ->
+                                        try {
+                                            val parts = birth.split("/").map { it.toInt() }
+                                            val today = Calendar.getInstance()
+                                            var a = today.get(Calendar.YEAR) - parts[2]
+                                            if (today.get(Calendar.MONTH) + 1 < parts[1] ||
+                                                (today.get(Calendar.MONTH) + 1 == parts[1] && today.get(Calendar.DAY_OF_MONTH) < parts[0])
+                                            ) a -= 1
+                                            a
+                                        } catch (e: Exception) { 0 }
+                                    } ?: 0
+
+                                    val medicine = MedicineRepository.findMedicineByName(medicines, reminder.medicineName)
+                                    val instructionText = medicine?.let { MedicineRepository.getInstructionForAge(it, age) }.orEmpty()
+                                    val noteText = reminder.note?.takeIf { it.isNotBlank() } ?: "Нет заметки"
+
+                                    withContext(Dispatchers.Main) {
+                                        val message = buildString {
+                                            if (instructionText.isNotEmpty()) append("Инструкция: $instructionText\n\n")
+                                            append("Заметка: $noteText")
+                                        }
+
+                                        AlertDialog.Builder(requireContext())
+                                            .setTitle("${reminder.medicineName} - ${reminder.time}")
+                                            .setMessage(message)
+                                            .setPositiveButton("ОК", null)
+                                            .show()
+                                    }
                                 }
                             }
+                            container.addView(tv)
                         }
-
-                        container.addView(tv)
                     }
                 }
             }
         }
     }
+
 }
