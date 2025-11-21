@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
         navController.graph = graph
 
         if (role == "child") {
-            bottomNav.menu.findItem(R.id.familyFragment)?.isVisible = false
+            // Удалена строка, скрывающая familyFragment (Статистику)
             bottomNav.menu.findItem(R.id.catalogFragment)?.isVisible = false
         }
     }

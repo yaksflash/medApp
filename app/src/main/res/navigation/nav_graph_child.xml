@@ -18,6 +18,12 @@
         android:label="Календарь"
         tools:layout="@layout/fragment_calendar" />
 
+    <!-- Добавлен фрагмент статистики -->
+    <fragment
+        android:id="@+id/familyFragment"
+        android:name="com.example.medapp.fragments.StatisticsFragment"
+        android:label="Статистика"
+        tools:layout="@layout/fragment_statistics" />
 
     <fragment
         android:id="@+id/profileFragment"

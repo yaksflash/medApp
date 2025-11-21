@@ -28,6 +28,24 @@ class StatisticsFragment : Fragment() {
 
     private lateinit var rvStatistics: RecyclerView
     private lateinit var adapter: StatisticsAdapter
+    private var ownerId: Int = -1 // по умолчанию ID родителя
+
+    companion object {
+        fun newInstance(ownerId: Int): StatisticsFragment {
+            val fragment = StatisticsFragment()
+            val args = Bundle()
+            args.putInt("ownerId", ownerId)
+            fragment.arguments = args
+            return fragment
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        arguments?.let {
+            ownerId = it.getInt("ownerId", -1)
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -42,28 +60,31 @@ class StatisticsFragment : Fragment() {
         rvStatistics = view.findViewById(R.id.rvStatistics)
         rvStatistics.layoutManager = LinearLayoutManager(requireContext())
         
+        // Если ownerId не был передан через arguments, берем из SharedPreferences
+        if (ownerId == -1) {
+            val prefs = requireContext().getSharedPreferences("user_data", 0)
+            ownerId = prefs.getInt("owner_id", -1)
+        }
+        
         loadStatistics()
     }
 
     private fun loadStatistics() {
-        val prefs = requireContext().getSharedPreferences("user_data", 0)
-        val currentUserId = prefs.getInt("owner_id", -1)
-
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
             val eventsDao = db.medicineEventDao()
             
             val uniqueMedicines = withContext(Dispatchers.IO) {
-                eventsDao.getUniqueMedicinesForOwner(currentUserId)
+                eventsDao.getUniqueMedicinesForOwner(ownerId)
             }
 
             val allEvents = withContext(Dispatchers.IO) {
-                eventsDao.getAllForOwner(currentUserId)
+                eventsDao.getAllForOwner(ownerId)
             }
 
             adapter = StatisticsAdapter(uniqueMedicines) { medicineName ->
                 val eventsForMedicine = allEvents.filter { it.medicineName == medicineName }
-                showCalendarDialog(medicineName, eventsForMedicine, currentUserId)
+                showCalendarDialog(medicineName, eventsForMedicine, ownerId)
             }
             rvStatistics.adapter = adapter
         }
@@ -77,7 +98,6 @@ class StatisticsFragment : Fragment() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // --- Календарь ---
         val calendar = Calendar.getInstance()
         
         val headerLayout = LinearLayout(context).apply {
@@ -109,7 +129,6 @@ class StatisticsFragment : Fragment() {
         }
         dialogView.addView(gridView)
 
-        // --- Сводная статистика снизу ---
         val totalDoses = events.size
         val uniqueDays = events.map { 
             val c = Calendar.getInstance().apply { timeInMillis = it.dateTimestamp }
@@ -125,7 +144,6 @@ class StatisticsFragment : Fragment() {
         }
         dialogView.addView(tvSummary)
 
-        // --- Логика календаря ---
         fun updateCalendar() {
             val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", Locale.getDefault())
             tvMonthYear.text = monthFormat.format(calendar.time)
@@ -205,7 +223,6 @@ class StatisticsFragment : Fragment() {
             updateCalendar()
         }
 
-        // --- Диалог ---
         val dialog = AlertDialog.Builder(context)
             .setTitle("История: $medicineName")
             .setView(dialogView)
@@ -231,14 +248,12 @@ class StatisticsFragment : Fragment() {
             db.medicineEventDao().deleteHistoryByName(userId, medicineName)
             
             withContext(Dispatchers.Main) {
-                // Перезагружаем список, чтобы удаленное лекарство исчезло из RecyclerView
                 loadStatistics()
                 Toast.makeText(requireContext(), "История удалена", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    // Внутренний адаптер для списка лекарств
     class StatisticsAdapter(
         private val medicines: List<String>,
         private val onClick: (String) -> Unit
