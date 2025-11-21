@@ -1,13 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background_color">
 
+    <!-- ================= СОСТОЯНИЕ 1: КАЛЕНДАРЬ ================= -->
     <LinearLayout
-        android:id="@+id/calendarContainer"
+        android:id="@+id/viewCalendar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"/>
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-</ScrollView>
+        <!-- Кнопка перехода в семью -->
+        <Button
+            android:id="@+id/btnOpenFamily"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Моя семья >"
+            android:textSize="18sp"
+            android:layout_margin="16dp"
+            android:backgroundTint="@color/accent_color"
+            android:textColor="@android:color/white"
+            android:elevation="4dp"/>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/calendarContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"/>
+
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- ================= СОСТОЯНИЕ 2: СЕМЬЯ (Скрыто по умолчанию) ================= -->
+    <LinearLayout
+        android:id="@+id/viewFamily"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@color/background_color"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Заголовок с крестиком -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Семья"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary_text"
+                android:layout_centerVertical="true"/>
+
+            <ImageView
+                android:id="@+id/btnCloseFamily"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"/>
+        </RelativeLayout>
+
+        <Button
+            android:id="@+id/btnAddChild"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Добавить ребенка"
+            android:backgroundTint="@color/accent_color"
+            android:textColor="@android:color/white"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvChildren"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp"/>
+    </LinearLayout>
+
+</FrameLayout>

@@ -25,9 +25,9 @@
 
     <fragment
         android:id="@+id/familyFragment"
-        android:name="com.example.medapp.fragments.FamilyFragment"
+        android:name="com.example.medapp.fragments.StatisticsFragment"
         android:label="Семья"
-        tools:layout="@layout/fragment_family" />
+        tools:layout="@layout/fragment_statistics" />
 
     <fragment
         android:id="@+id/profileFragment"

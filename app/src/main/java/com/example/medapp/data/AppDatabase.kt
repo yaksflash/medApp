@@ -6,12 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.medapp.models.Reminder
 import com.example.medapp.models.Child
+import com.example.medapp.models.MedicineEvent
 
-@Database(entities = [Reminder::class, Child::class], version = 7)
+@Database(entities = [Reminder::class, Child::class, MedicineEvent::class], version = 11)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun reminderDao(): ReminderDao
     abstract fun childDao(): ChildDao
+    abstract fun medicineEventDao(): MedicineEventDao
 
     companion object {
         @Volatile
@@ -24,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .fallbackToDestructiveMigration() // <- на время разработки удобно
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

@@ -15,8 +15,8 @@
             android:title="Календарь" />
     <item
             android:id="@+id/familyFragment"
-        android:icon="@drawable/masks"
-            android:title="Семья" />
+        android:icon="@drawable/graphs"
+            android:title="Статистика" />
     <item
         android:id="@+id/profileFragment"
         android:icon="@drawable/setting"
