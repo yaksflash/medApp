@@ -130,8 +130,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     private fun getBotResponse(query: String): String {
-        // (Логика бота остается прежней, сокращена для читаемости при записи, но в реальном файле будет полной)
-        // Я использую ту же логику, что была в предыдущем шаге
         val q = query.lowercase(Locale.getDefault())
         val hasDelete = q.contains("удалить") || q.contains("убрать") || q.contains("отменить")
         val hasAdd = q.contains("добавить") || q.contains("создать") || q.contains("новый") || q.contains("назначить")
@@ -341,7 +339,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                                         reminder.isTaken = isChecked
                                         reminderDao.update(reminder)
 
-                                        // Сохраняем историю приема
+                                        // ЛОГИКА ОБНОВЛЕНИЯ ИСТОРИИ
                                         if (isChecked) {
                                             val event = MedicineEvent(
                                                 medicineName = reminder.medicineName,
@@ -350,6 +348,25 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                                                 isTaken = true
                                             )
                                             eventDao.insert(event)
+                                        } else {
+                                            // Если сняли галочку - удаляем событие за СЕГОДНЯ
+                                            val calendar = Calendar.getInstance()
+                                            calendar.set(Calendar.HOUR_OF_DAY, 0)
+                                            calendar.set(Calendar.MINUTE, 0)
+                                            calendar.set(Calendar.SECOND, 0)
+                                            val startOfDay = calendar.timeInMillis
+                                            
+                                            calendar.set(Calendar.HOUR_OF_DAY, 23)
+                                            calendar.set(Calendar.MINUTE, 59)
+                                            calendar.set(Calendar.SECOND, 59)
+                                            val endOfDay = calendar.timeInMillis
+
+                                            eventDao.deleteEventForDay(
+                                                ownerId = reminder.ownerId,
+                                                medicineName = reminder.medicineName,
+                                                startTime = startOfDay,
+                                                endTime = endOfDay
+                                            )
                                         }
                                     }
                                 }

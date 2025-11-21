@@ -2,7 +2,11 @@ package com.example.medapp.fragments
 
 import android.app.AlertDialog
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -49,25 +53,23 @@ class StatisticsFragment : Fragment() {
             val db = AppDatabase.getDatabase(requireContext())
             val eventsDao = db.medicineEventDao()
             
-            // Получаем список уникальных лекарств
             val uniqueMedicines = withContext(Dispatchers.IO) {
                 eventsDao.getUniqueMedicinesForOwner(currentUserId)
             }
 
-            // Получаем все события приема для этого пользователя
             val allEvents = withContext(Dispatchers.IO) {
                 eventsDao.getAllForOwner(currentUserId)
             }
 
             adapter = StatisticsAdapter(uniqueMedicines) { medicineName ->
                 val eventsForMedicine = allEvents.filter { it.medicineName == medicineName }
-                showCalendarDialog(medicineName, eventsForMedicine)
+                showCalendarDialog(medicineName, eventsForMedicine, currentUserId)
             }
             rvStatistics.adapter = adapter
         }
     }
 
-    private fun showCalendarDialog(medicineName: String, events: List<MedicineEvent>) {
+    private fun showCalendarDialog(medicineName: String, events: List<MedicineEvent>, userId: Int) {
         val context = requireContext()
         val dialogView = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -75,8 +77,8 @@ class StatisticsFragment : Fragment() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // Управление месяцем
-        val calendar = Calendar.getInstance() // Текущий месяц по умолчанию
+        // --- Календарь ---
+        val calendar = Calendar.getInstance()
         
         val headerLayout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -98,17 +100,32 @@ class StatisticsFragment : Fragment() {
         headerLayout.addView(btnNext)
         dialogView.addView(headerLayout)
 
-        // Сетка дней
         val gridView = GridView(context).apply {
             numColumns = 7
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             horizontalSpacing = 4
             verticalSpacing = 4
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 800) 
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 900)
         }
         dialogView.addView(gridView)
 
-        // Функция обновления календаря
+        // --- Сводная статистика снизу ---
+        val totalDoses = events.size
+        val uniqueDays = events.map { 
+            val c = Calendar.getInstance().apply { timeInMillis = it.dateTimestamp }
+            "${c.get(Calendar.YEAR)}-${c.get(Calendar.DAY_OF_YEAR)}"
+        }.distinct().size
+
+        val tvSummary = TextView(context).apply {
+            text = "Всего дней приема: $uniqueDays\nВсего принято доз: $totalDoses"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, 16, 0, 0)
+            setTypeface(null, Typeface.BOLD)
+        }
+        dialogView.addView(tvSummary)
+
+        // --- Логика календаря ---
         fun updateCalendar() {
             val monthFormat = java.text.SimpleDateFormat("MMMM yyyy", Locale.getDefault())
             tvMonthYear.text = monthFormat.format(calendar.time)
@@ -117,16 +134,13 @@ class StatisticsFragment : Fragment() {
             val tempCal = calendar.clone() as Calendar
             tempCal.set(Calendar.DAY_OF_MONTH, 1)
             
-            // Сдвиг начала недели (1 = Воскресенье, 2 = Понедельник)
             val firstDayOfWeek = tempCal.get(Calendar.DAY_OF_WEEK)
             val shift = if (firstDayOfWeek == Calendar.SUNDAY) 6 else firstDayOfWeek - 2
             
-            // Пустые ячейки до начала месяца
             for (i in 0 until shift) {
                 days.add(null)
             }
 
-            // Дни месяца
             val maxDay = tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
             for (i in 1..maxDay) {
                 days.add(tempCal.time)
@@ -135,16 +149,15 @@ class StatisticsFragment : Fragment() {
 
             val calendarAdapter = object : ArrayAdapter<Date>(context, 0, days) {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    // Создаем TextView программно для полного контроля
                     val view = (convertView as? TextView) ?: TextView(context).apply {
                         layoutParams = android.widget.AbsListView.LayoutParams(
                             android.widget.AbsListView.LayoutParams.MATCH_PARENT,
-                            100 // Фиксированная высота ячейки, чтобы они были квадратными
+                            130
                         )
                         gravity = Gravity.CENTER
                         textSize = 16f
                         setTextColor(Color.BLACK)
-                        maxLines = 1 // Запрещаем перенос строк
+                        maxLines = 2
                     }
                     
                     val date = getItem(position)
@@ -154,18 +167,23 @@ class StatisticsFragment : Fragment() {
                         view.background = null
                     } else {
                         val calDay = Calendar.getInstance().apply { time = date }
-                        view.text = calDay.get(Calendar.DAY_OF_MONTH).toString()
+                        val dayNumberStr = calDay.get(Calendar.DAY_OF_MONTH).toString()
                         
-                        // Проверяем, был ли прием в этот день
-                        val isTaken = events.any { 
+                        val count = events.count { 
                             val eventCal = Calendar.getInstance().apply { timeInMillis = it.dateTimestamp }
                             eventCal.get(Calendar.YEAR) == calDay.get(Calendar.YEAR) &&
                             eventCal.get(Calendar.DAY_OF_YEAR) == calDay.get(Calendar.DAY_OF_YEAR)
                         }
 
-                        if (isTaken) {
+                        if (count > 0) {
+                            val text = "$dayNumberStr\n($count)"
+                            val spannable = SpannableString(text)
+                            spannable.setSpan(StyleSpan(Typeface.BOLD), 0, dayNumberStr.length, 0)
+                            spannable.setSpan(RelativeSizeSpan(0.7f), dayNumberStr.length + 1, text.length, 0)
+                            view.text = spannable
                             view.setBackgroundColor(Color.GREEN)
                         } else {
+                            view.text = dayNumberStr
                             view.setBackgroundColor(Color.TRANSPARENT)
                         }
                     }
@@ -187,11 +205,37 @@ class StatisticsFragment : Fragment() {
             updateCalendar()
         }
 
-        AlertDialog.Builder(context)
-            .setTitle("История приема: $medicineName")
+        // --- Диалог ---
+        val dialog = AlertDialog.Builder(context)
+            .setTitle("История: $medicineName")
             .setView(dialogView)
             .setPositiveButton("Закрыть", null)
-            .show()
+            .setNegativeButton("Удалить историю") { _, _ ->
+                AlertDialog.Builder(context)
+                    .setTitle("Удаление истории")
+                    .setMessage("Вы уверены, что хотите удалить ВСЮ историю приема лекарства '$medicineName'? Это действие нельзя отменить.")
+                    .setPositiveButton("Удалить") { _, _ ->
+                        deleteHistory(userId, medicineName)
+                    }
+                    .setNegativeButton("Отмена", null)
+                    .show()
+            }
+            .create()
+            
+        dialog.show()
+    }
+    
+    private fun deleteHistory(userId: Int, medicineName: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.getDatabase(requireContext())
+            db.medicineEventDao().deleteHistoryByName(userId, medicineName)
+            
+            withContext(Dispatchers.Main) {
+                // Перезагружаем список, чтобы удаленное лекарство исчезло из RecyclerView
+                loadStatistics()
+                Toast.makeText(requireContext(), "История удалена", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // Внутренний адаптер для списка лекарств

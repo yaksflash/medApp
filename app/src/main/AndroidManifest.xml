@@ -35,6 +35,11 @@
             android:name=".receivers.ReminderReceiver"
             android:exported="true" />
 
+        <!-- Receiver для обработки нажатия кнопки "Принято" -->
+        <receiver
+            android:name=".receivers.ActionReceiver"
+            android:exported="true" />
+
         <!-- Receiver для восстановления после перезагрузки -->
         <receiver
             android:name=".receivers.BootReceiver"

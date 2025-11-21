@@ -27,7 +27,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val reminderId = intent.getIntExtra("reminderId", 0)
         val dayOfWeek = intent.getIntExtra("dayOfWeek", 1)
         val ownerId = intent.getIntExtra("ownerId", -1)
-        val note = intent.getStringExtra("note") // <-- новая заметка
+        val note = intent.getStringExtra("note")
 
         CoroutineScope(Dispatchers.IO).launch {
             val db = AppDatabase.getDatabase(context)
@@ -68,8 +68,22 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val pendingIntent = PendingIntent.getActivity(
                     context,
-                    0,
+                    reminderId, // Уникальный ID для открытия активности
                     Intent(context, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                // Создаем интент для действия "Принято"
+                val actionIntent = Intent(context, ActionReceiver::class.java).apply {
+                    putExtra("reminderId", reminderId)
+                    putExtra("medicineName", medicineName)
+                    putExtra("ownerId", ownerId)
+                }
+                
+                val actionPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    reminderId, // Важно: уникальный код запроса
+                    actionIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
@@ -80,11 +94,13 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setAutoCancel(true)
                     .setContentIntent(pendingIntent)
+                    // Добавляем кнопку действия
+                    .addAction(android.R.drawable.ic_input_add, "Принято", actionPendingIntent)
                     .build()
 
                 notificationManager.notify(reminderId, notification)
 
-                // Перезапланируем на следующую неделю, передавая заметку
+                // Перезапланируем на следующую неделю
                 ReminderScheduler.scheduleWeeklyReminder(
                     context = context,
                     reminderId = reminderId,
@@ -92,7 +108,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     time = time,
                     medicineName = medicineName,
                     ownerId = ownerId,
-                    note = note // <-- передаём заметку
+                    note = note
                 )
             }
         }
